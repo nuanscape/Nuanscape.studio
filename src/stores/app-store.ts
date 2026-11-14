@@ -25,33 +25,10 @@ interface AuthState {
   user: AppUser
   accounts: Account[]
   session: Account | null
-  adminAuthed: boolean
   updateProfile: (patch: Partial<AppUser>) => void
   register: (input: { name: string; email: string; password: string }) => AuthResult
   login: (input: { email: string; password: string }) => AuthResult
   logout: () => void
-  loginAdmin: (pin: string) => boolean
-  logoutAdmin: () => void
-}
-
-const ADMIN_PIN = '1234'
-const ADMIN_SESSION_KEY = 'nuanscape-admin-session'
-
-function readAdminSession() {
-  try {
-    return window.sessionStorage.getItem(ADMIN_SESSION_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-function writeAdminSession(value: boolean) {
-  try {
-    if (value) window.sessionStorage.setItem(ADMIN_SESSION_KEY, '1')
-    else window.sessionStorage.removeItem(ADMIN_SESSION_KEY)
-  } catch {
-    /* storage unavailable */
-  }
 }
 
 function toUser(account: Account): AppUser {
@@ -65,7 +42,6 @@ export const useAuthStore = create<AuthState>()(
       user: currentUser,
       accounts: [],
       session: null,
-      adminAuthed: readAdminSession(),
       updateProfile: (patch) =>
         set((state) => ({
           user: {
@@ -94,7 +70,7 @@ export const useAuthStore = create<AuthState>()(
             password,
             role: 'Owner',
             initials: initialsOf(cleanName),
-            plan: 'Studio',
+            plan: 'Demo',
             timezone: 'Asia/Jakarta',
             joinedAt: new Date().toISOString(),
           }
@@ -114,20 +90,7 @@ export const useAuthStore = create<AuthState>()(
         return matched ? { ok: true } : { ok: false, error: 'Email atau password salah.' }
       },
       logout: () => {
-        writeAdminSession(false)
-        set({ session: null, adminAuthed: false, user: currentUser })
-      },
-      loginAdmin: (pin) => {
-        const ok = pin.trim() === ADMIN_PIN
-        if (ok) {
-          writeAdminSession(true)
-          set({ adminAuthed: true })
-        }
-        return ok
-      },
-      logoutAdmin: () => {
-        writeAdminSession(false)
-        set({ adminAuthed: false })
+        set({ session: null, user: currentUser })
       },
     }),
     {

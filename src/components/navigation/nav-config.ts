@@ -1,9 +1,11 @@
 import {
   Activity,
+  BarChart3,
   Bell,
   Blocks,
   Bot,
   Boxes,
+  Building2,
   CircleDollarSign,
   Clapperboard,
   ClipboardList,
@@ -12,22 +14,21 @@ import {
   Film,
   Gauge,
   Goal,
+  KeyRound,
   LayoutDashboard,
   Lightbulb,
   ListOrdered,
   type LucideIcon,
   Package,
   Plug,
-  Settings,
   Store,
   Tags,
   Target,
+  TicketPercent,
   TrendingUp,
   Users,
   Wallet,
-  Wand2,
   Warehouse,
-  Youtube,
 } from 'lucide-react'
 
 export type WorkspaceId = 'monitor' | 'seller' | 'content' | 'finance'
@@ -60,10 +61,12 @@ export const workspaces: Workspace[] = [
     icon: LayoutDashboard,
     accent: '#F5D64B',
     items: [
-      { label: 'Agent Monitor', href: '/app/monitor', icon: LayoutDashboard },
-      { label: 'Automations', href: '/app/automations', icon: Blocks },
-      { label: 'Notifications', href: '/app/notifications', icon: Bell },
-      { label: 'Settings', href: '/app/settings', icon: Settings },
+      { label: 'Office', href: '/app/monitor', icon: Building2 },
+      { label: 'Agent Team', href: '/app/monitor/team', icon: Users },
+      { label: 'Automation', href: '/app/monitor/automation', icon: Blocks },
+      { label: 'Report', href: '/app/monitor/report', icon: FileBarChart },
+      { label: 'Notifications', href: '/app/monitor/notifications', icon: Bell },
+      { label: 'API Settings', href: '/app/monitor/settings', icon: KeyRound },
     ],
   },
   {
@@ -81,8 +84,10 @@ export const workspaces: Workspace[] = [
       { label: 'Inventory', href: '/app/seller/inventory', icon: Warehouse },
       { label: 'Orders', href: '/app/seller/orders', icon: ClipboardList },
       { label: 'Finance', href: '/app/seller/finance', icon: CircleDollarSign },
+      { label: 'Promosi & Iklan', href: '/app/seller/promotions', icon: TicketPercent },
       { label: 'SEO & GEO', href: '/app/seller/seo', icon: Tags },
       { label: 'Seller Intelligence', href: '/app/seller/intelligence', icon: Bot },
+      { label: 'Agent Report', href: '/app/seller/agent-report', icon: FileBarChart },
     ],
   },
   {
@@ -95,9 +100,11 @@ export const workspaces: Workspace[] = [
     accent: '#24C7C4',
     items: [
       { label: 'Overview', href: '/app/content/overview', icon: Activity },
-      { label: 'Accounts', href: '/app/content/accounts', icon: Users },
-      { label: 'Long-form', href: '/app/content/long-form', icon: Youtube },
-      { label: 'Short-form', href: '/app/content/short-form', icon: Clapperboard },
+      { label: 'Flow Konten', href: '/app/content/flow', icon: Clapperboard },
+      { label: 'Draft', href: '/app/content/drafts', icon: Film },
+      { label: 'Account', href: '/app/content/account', icon: Users },
+      { label: 'Analytic', href: '/app/content/analytic', icon: BarChart3 },
+      { label: 'Agent Report', href: '/app/content/agent-report', icon: Bot },
     ],
   },
   {
@@ -123,9 +130,15 @@ export const workspaces: Workspace[] = [
 
 export const extraNavigation: NavItem[] = [
   { label: 'Profile', href: '/app/profile', icon: Compass },
-  { label: 'Automations', href: '/app/automations', icon: Wand2 },
-  { label: 'Settings', href: '/app/settings', icon: Settings },
 ]
+
+export const searchableWorkspaces = workspaces.map((workspace) => ({
+  label: workspace.label,
+  href: workspace.href,
+  group: 'Workspace',
+  icon: workspace.icon,
+  keywords: `${workspace.label} ${workspace.short} ${workspace.description}`.toLowerCase(),
+}))
 
 export const searchableRoutes = [
   ...workspaces.flatMap((w) =>
@@ -160,6 +173,6 @@ export function getCurrentNavItem(pathname: string): NavItem | undefined {
 export const quickActions = [
   { label: 'Buka Agent Monitor', href: '/app/monitor', icon: LayoutDashboard },
   { label: 'Tambah produk seller', href: '/app/seller/products?new=1', icon: Package },
-  { label: 'Generate ide konten', href: '/app/content/short-form/ideas', icon: Lightbulb },
+  { label: 'Generate ide konten', href: '/app/content/flow', icon: Lightbulb },
   { label: 'Tambah transaksi', href: '/app/finance/transactions?new=1', icon: Wallet },
 ]

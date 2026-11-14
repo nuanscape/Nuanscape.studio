@@ -300,48 +300,40 @@ export function ContentFormatLayout() {
 
   return (
     <ContentFormatProvider format={format}>
-      <div className="space-y-5">
-        <section className="rounded-2xl border border-line bg-surface/50 p-4 lg:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-[10px] font-medium uppercase tracking-[0.18em] text-text-muted">Content flow</p>
-              <div className="mt-1 flex items-center gap-2">
-                <h1 className="text-[20px] font-semibold tracking-tight text-text-primary lg:text-[22px]">{meta.label}</h1>
-                <span
-                  className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-                  style={{ color: meta.accent, backgroundColor: `${meta.accent}18` }}
-                >
-                  {meta.tagline}
-                </span>
-              </div>
-              <p className="mt-1 max-w-2xl text-[12px] leading-relaxed text-text-muted">{meta.description}</p>
-            </div>
-            <div className="w-full max-w-full lg:max-w-[420px]">
-              <p className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-text-muted">Akun</p>
-              <AccountSwitcher format={format} accounts={accounts} accountId={accountId} />
-            </div>
+      <div className="space-y-4">
+        <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="size-2 rounded-full" style={{ backgroundColor: meta.accent }} />
+            <span className="text-[12px] font-semibold text-text-primary">{meta.label}</span>
+            <span className="text-[11px] text-text-muted">{meta.stageHint}</span>
           </div>
+          <div className="w-full max-w-full lg:max-w-[420px]">
+            <AccountSwitcher format={format} accounts={accounts} accountId={accountId} />
+          </div>
+        </div>
 
-          <nav className="mt-4 flex items-center gap-1 overflow-x-auto border-t border-line pt-3" aria-label={`Tahap ${meta.label}`}>
-            {meta.stages.map((stage) => (
-              <NavLink
-                key={stage.key}
-                to={`${basePath}/${stage.key}${accountId ? `?account=${accountId}` : ''}`}
-                className={({ isActive }) =>
-                  cn(
-                    'flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors',
-                    isActive
-                      ? 'bg-white/[0.08] text-text-primary'
-                      : 'text-text-muted hover:bg-white/[0.04] hover:text-text-secondary',
-                  )
-                }
-              >
-                <stage.icon className="size-3.5 [stroke-width:1.8]" />
-                {stage.label}
-              </NavLink>
-            ))}
-          </nav>
-        </section>
+        <nav
+          className="flex items-center gap-1 overflow-x-auto border-y border-line py-2"
+          aria-label={`Tahap ${meta.label}`}
+        >
+          {meta.stages.map((stage) => (
+            <NavLink
+              key={stage.key}
+              to={`${basePath}/${stage.key}${accountId ? `?account=${accountId}` : ''}`}
+              className={({ isActive }) =>
+                cn(
+                  'flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors',
+                  isActive
+                    ? 'bg-white/[0.08] text-text-primary'
+                    : 'text-text-muted hover:bg-white/[0.04] hover:text-text-secondary',
+                )
+              }
+            >
+              <stage.icon className="size-3.5 [stroke-width:1.8]" />
+              {stage.label}
+            </NavLink>
+          ))}
+        </nav>
 
         <Outlet />
       </div>

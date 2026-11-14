@@ -4,7 +4,7 @@ import { ArrowUpRight, CheckCircle2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
 import { agentProfiles, type AgentId } from '@/features/monitor/components/agents'
-import { automations } from '@/data/mock'
+import { useAutomationStore } from '@/stores/automation-store'
 import { useContentStore } from '@/stores/content-store'
 import { useFinanceStore } from '@/stores/finance-store'
 import { useSellerStore } from '@/stores/seller-store'
@@ -102,6 +102,7 @@ export function AgentStructure() {
   const finance = useFinanceStore()
   const shop = useSellerStore()
   const content = useContentStore()
+  const automations = useAutomationStore((s) => s.items)
   const head = agentProfiles.muhe
 
   const stats: Record<AgentId, { value: number; label: string }> = {
@@ -184,7 +185,7 @@ export function AgentStructure() {
           <span className="absolute right-[16.6667%] top-8 h-8 w-px bg-white/[0.12]" />
         </div>
 
-        <div className="mt-8 grid gap-3.5 lg:mt-0 lg:grid-cols-3 lg:gap-6">
+        <div className="mt-8 grid grid-cols-1 gap-3.5 lg:mt-0 lg:grid-cols-3 lg:gap-6">
           {(['asep', 'ucup', 'bambang'] as const).map((id) => (
             <SubAgentCard
               key={id}

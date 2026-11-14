@@ -88,9 +88,9 @@ export function Dialog({
                 </Button>
               </div>
             )}
-            <div className="max-h-[calc(92dvh-9rem)] overflow-y-auto p-5">{children}</div>
+            <div className="max-h-[calc(92dvh-9rem)] overflow-y-auto overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-5">{children}</div>
             {footer ? (
-              <div className="flex items-center justify-end gap-2 border-t border-line bg-background-secondary/40 px-5 py-3.5">
+              <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line bg-background-secondary/40 px-4 py-3 pb-[max(0.875rem,env(safe-area-inset-bottom))] sm:px-5">
                 {footer}
               </div>
             ) : null}

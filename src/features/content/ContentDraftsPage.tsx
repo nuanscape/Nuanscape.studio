@@ -1,172 +1,105 @@
 import * as React from 'react'
-import { Link } from 'react-router-dom'
-import { ArrowRight, FileText, Plus, Trash2 } from 'lucide-react'
-import { PageHeader } from '@/components/shared/page-header'
+import { Play } from 'lucide-react'
+import { PageHeader, SectionHeader } from '@/components/shared/page-header'
 import { Card } from '@/components/ui/card'
-import { Button, buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { PlatformChip } from '@/features/content/components/content-ui'
-import { resolveAccount, useContentScope } from '@/features/content/components/content-flow'
+import { platformColor } from '@/features/content/components/content-ui'
+import { platformAccounts } from '@/data/mock'
 import { useContentStore } from '@/stores/content-store'
-import { useToastStore } from '@/stores/app-store'
-import type { ContentItem, ContentStatus } from '@/types'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatNumber } from '@/lib/utils'
+import type { Platform } from '@/types'
 
-const columns: ContentStatus[] = [
-  'Idea',
-  'Script Ready',
-  'Production',
-  'Editing',
-  'Review',
-  'Ready to Publish',
-  'Published',
-]
+const platforms: Platform[] = ['YouTube', 'TikTok', 'Instagram']
 
-function nextStatus(status: ContentStatus): ContentStatus | null {
-  const index = columns.indexOf(status)
-  if (index === -1 || index === columns.length - 1) return null
-  return columns[index + 1]
-}
-
-const longLabels: Partial<Record<ContentStatus, string>> = {
-  Idea: 'Ide',
-  'Script Ready': 'Naskah',
-  Production: 'Produksi',
-  'Ready to Publish': 'Siap tayang',
-  Published: 'Tayang',
-}
-
-const shortLabels: Partial<Record<ContentStatus, string>> = {
-  Idea: 'Ide',
-  'Script Ready': 'Hook',
-  Production: 'Shoot',
-  Editing: 'Edit',
-  'Ready to Publish': 'Siap posting',
-  Published: 'Tayang',
+function Thumb({ title, url, platform }: { title: string; url?: string; platform: Platform }) {
+  const [err, setErr] = React.useState(false)
+  if (url && !err) {
+    return <img src={url} alt={title} className="h-full w-full object-cover" loading="lazy" onError={() => setErr(true)} />
+  }
+  const initials = title.split(' ').slice(0, 2).map((w) => w[0]).join('').toUpperCase()
+  return (
+    <div className="flex h-full w-full items-center justify-center" style={{ background: `linear-gradient(135deg, ${platformColor[platform]}33, #111)` }}>
+      <span className="text-[22px] font-bold text-white/80">{initials || 'VD'}</span>
+    </div>
+  )
 }
 
 export function ContentDraftsPage() {
-  const { updateStatus, deleteContent } = useContentStore()
-  const { format, items, account, stagePath } = useContentScope()
-  const isLong = format === 'long'
-  const labels = isLong ? longLabels : shortLabels
-  const { push } = useToastStore()
-  const [toDelete, setToDelete] = React.useState<ContentItem | null>(null)
-  const [filter, setFilter] = React.useState<'all' | 'active'>('all')
-
-  const visible = filter === 'active' ? items.filter((i) => i.status !== 'Published') : items
+  const items = useContentStore((s) => s.items)
+  const drafts = items.filter((i) => i.generated || i.previewUrl || i.videoUrl)
 
   return (
     <div>
       <PageHeader
-        title={isLong ? 'Production board' : 'Batch board'}
-        description={
-          isLong
-            ? `Pindahkan episode dari ide hingga siap tayang${account ? ` untuk ${account.handle}` : ' di akun YouTube'} dengan alur panjang.`
-            : `Pindahkan konten pendek dari hook hingga siap posting${account ? ` untuk ${account.handle}` : ''} dalam satu sesi batch.`
-        }
-        actions={
-          <>
-            <Button variant={filter === 'all' ? 'secondary' : 'ghost'} onClick={() => setFilter(filter === 'all' ? 'active' : 'all')}>
-              {filter === 'all' ? 'Tampilkan aktif' : 'Tampilkan semua'}
-            </Button>
-            <Link to={stagePath('studio')} className={buttonVariants()}>
-              <Plus /> Konten baru
-            </Link>
-          </>
-        }
+        title="Draft"
+        description="Seluruh hasil generate konten dari 3 platform dan 3 akun masing-masing platform."
       />
 
-      <div className="flex gap-3 overflow-x-auto pb-3">
-        {columns.map((column) => {
-          const columnItems = visible.filter((i) => i.status === column)
+      <div className="space-y-6">
+        {platforms.map((platform) => {
+          const accounts = platformAccounts.filter((a) => a.platform === platform)
+          const platformDrafts = drafts.filter((d) => d.platform === platform)
           return (
-            <div key={column} className="flex w-[270px] shrink-0 flex-col rounded-xl border border-line bg-card/40">
-              <div className="flex items-center justify-between border-b border-line px-3 py-2.5">
-                <p className="text-[11px] font-semibold text-text-primary">{labels[column] ?? column}</p>
-                <Badge tone="outline">{columnItems.length}</Badge>
+            <Card key={platform} className="p-5">
+              <SectionHeader
+                title={platform}
+                description={`${platformDrafts.length} hasil generate · ${accounts.length} akun`}
+                action={<Badge tone="outline" style={{ borderColor: `${platformColor[platform]}55`, color: platformColor[platform] }}>{platform}</Badge>}
+              />
+              <div className="space-y-5">
+                {accounts.map((account) => {
+                  const accDrafts = drafts.filter((d) => d.accountId === account.id)
+                  return (
+                    <div key={account.id}>
+                      <div className="mb-2 flex items-center gap-2">
+                        <span className="size-2 rounded-full" style={{ backgroundColor: platformColor[platform] }} />
+                        <p className="text-[12px] font-semibold text-text-primary">{account.name}</p>
+                        <span className="text-[10px] text-text-muted">{account.handle}</span>
+                        <Badge tone="outline" className="ml-auto text-[9px]">{accDrafts.length} video</Badge>
+                      </div>
+                      {accDrafts.length ? (
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                          {accDrafts.map((item) => (
+                            <div key={item.id} className="group overflow-hidden rounded-xl border border-line bg-white/[0.02]">
+                              <div className="relative aspect-video w-full bg-[#111]">
+                                <Thumb title={item.title} url={item.previewUrl || item.thumbnail} platform={item.platform} />
+                                <span className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[9px] text-white">Video</span>
+                                <span className="pointer-events-none absolute inset-0 grid place-items-center bg-black/0 opacity-0 transition-opacity group-hover:bg-black/25 group-hover:opacity-100">
+                                  <span className="grid size-10 place-items-center rounded-full bg-white/90 text-black"><Play className="ml-0.5 size-4" /></span>
+                                </span>
+                              </div>
+                              <div className="p-3">
+                                <p className="line-clamp-2 text-[12px] font-medium leading-snug text-text-primary" title={item.title}>{item.title}</p>
+                                <p className="mt-1 text-[10px] text-text-muted">{account.handle} · {formatDate(item.createdAt, 'd MMM yyyy')}</p>
+                                {item.thumbnailStyle || item.animationStyle || item.musicStyle ? (
+                                  <div className="mt-1.5 flex flex-wrap gap-1">
+                                    {item.thumbnailStyle ? <Badge tone="outline" className="text-[8px]">{item.thumbnailStyle}</Badge> : null}
+                                    {item.animationStyle ? <Badge tone="outline" className="text-[8px]">{item.animationStyle}</Badge> : null}
+                                    {item.musicStyle ? <Badge tone="outline" className="text-[8px]">{item.musicStyle}</Badge> : null}
+                                  </div>
+                                ) : null}
+                                <div className="mt-1.5 flex items-center gap-2 text-[9px] text-text-muted">
+                                  <span>{formatNumber(item.views)} views</span>
+                                  <span>·</span>
+                                  <Badge tone={item.status === 'Published' ? 'success' : 'info'} className="text-[8px]">{item.status}</Badge>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-[11px] text-text-muted">
+                          Belum ada hasil generate untuk akun ini.
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
-              <div className="flex-1 space-y-2 overflow-y-auto p-2.5" style={{ minHeight: 380, maxHeight: '62vh' }}>
-                {columnItems.length === 0 ? (
-                  <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-line text-[10px] text-text-muted">
-                    Kosong
-                  </div>
-                ) : (
-                  columnItems.map((item) => {
-                    const next = nextStatus(item.status)
-                    return (
-                      <Card key={item.id} className="p-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <PlatformChip platform={item.platform} />
-                          <span className="truncate text-[9px] text-text-muted">{resolveAccount(item)?.handle}</span>
-                        </div>
-                        <p className="mt-1.5 text-[11px] font-medium leading-snug text-text-primary">{item.title}</p>
-                        <div className="mt-1.5 flex items-center gap-1.5 text-[9px] text-text-muted">
-                          <span>{item.format}</span>
-                          <span>·</span>
-                          <span>{formatDate(item.scheduledAt, 'd MMM')}</span>
-                        </div>
-                        <div className="mt-2 flex items-center gap-1 border-t border-line pt-2">
-                          {item.script ? (
-                            <Badge tone="primary" className="text-[9px]"><FileText className="size-2.5" /> {isLong ? 'Naskah' : 'Hook'}</Badge>
-                          ) : (
-                            <Link to={stagePath('scripts')} className="text-[9px] text-text-muted hover:text-primary">
-                              {isLong ? 'Tulis naskah' : 'Tulis hook'}
-                            </Link>
-                          )}
-                          <span className="flex-1" />
-                          {next ? (
-                            <Button
-                              size="icon-sm"
-                              variant="ghost"
-                              aria-label={`Pindahkan ke ${next}`}
-                              title={`Pindahkan ke ${next}`}
-                              onClick={() => {
-                                updateStatus(item.id, next)
-                                push({ title: 'Status diperbarui', description: `${item.title} → ${labels[next] ?? next}`, tone: 'success' })
-                              }}
-                            >
-                              <ArrowRight />
-                            </Button>
-                          ) : null}
-                          <Button
-                            size="icon-sm"
-                            variant="ghost"
-                            aria-label="Hapus konten"
-                            onClick={() => setToDelete(item)}
-                          >
-                            <Trash2 />
-                          </Button>
-                        </div>
-                      </Card>
-                    )
-                  })
-                )}
-              </div>
-            </div>
+            </Card>
           )
         })}
       </div>
-
-      <p className="mt-2 text-[10px] text-text-muted">
-        Board menampilkan status saat ini. Gunakan tombol panah untuk memindahkan ke tahap berikutnya.
-        Publish tetap manual.
-      </p>
-
-      <ConfirmDialog
-        open={Boolean(toDelete)}
-        onClose={() => setToDelete(null)}
-        onConfirm={() => {
-          if (toDelete) {
-            deleteContent(toDelete.id)
-            push({ title: 'Konten dihapus', description: toDelete.title, tone: 'info' })
-          }
-        }}
-        title="Hapus konten?"
-        description={toDelete ? `“${toDelete.title}” akan dihapus dari pipeline lokal.` : undefined}
-        confirmLabel="Hapus konten"
-      />
     </div>
   )
 }

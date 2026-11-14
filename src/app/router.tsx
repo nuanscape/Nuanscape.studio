@@ -1,8 +1,8 @@
 import * as React from 'react'
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom'
 import { DashboardLayout } from '@/layouts/DashboardLayout'
 import { MainLayout } from '@/layouts/MainLayout'
-import { ContentFormatLayout } from '@/features/content/components/content-flow'
+
 import { getCurrentNavItem } from '@/components/navigation/nav-config'
 import { useAuthStore } from '@/stores/app-store'
 
@@ -25,25 +25,21 @@ const FinanceAssetsPage = lazyPage(() => import('@/features/finance/FinanceAsset
 const FinanceGoalsPage = lazyPage(() => import('@/features/finance/FinanceGoalsPage'), 'FinanceGoalsPage')
 const FinanceReportsPage = lazyPage(() => import('@/features/finance/FinanceReportsPage'), 'FinanceReportsPage')
 const ContentOverviewPage = lazyPage(() => import('@/features/content/ContentOverviewPage'), 'ContentOverviewPage')
-const ContentFormatHubPage = lazyPage(() => import('@/features/content/ContentFormatHubPage'), 'ContentFormatHubPage')
+const ContentProductionPage = lazyPage(() => import('@/features/content/ContentProductionPage'), 'ContentProductionPage')
 const ContentAccountsPage = lazyPage(() => import('@/features/content/ContentAccountsPage'), 'ContentAccountsPage')
-const ContentAccountPage = lazyPage(() => import('@/features/content/ContentAccountPage'), 'ContentAccountPage')
-const ContentResearchPage = lazyPage(() => import('@/features/content/ContentResearchPage'), 'ContentResearchPage')
-const ContentIdeasPage = lazyPage(() => import('@/features/content/ContentIdeasPage'), 'ContentIdeasPage')
-const ContentScriptsPage = lazyPage(() => import('@/features/content/ContentScriptsPage'), 'ContentScriptsPage')
-const ContentStudioPage = lazyPage(() => import('@/features/content/ContentStudioPage'), 'ContentStudioPage')
-const ContentCalendarPage = lazyPage(() => import('@/features/content/ContentCalendarPage'), 'ContentCalendarPage')
-const ContentLibraryPage = lazyPage(() => import('@/features/content/ContentLibraryPage'), 'ContentLibraryPage')
+const ContentAnalyticsHubPage = lazyPage(() => import('@/features/content/ContentAnalyticsHubPage'), 'ContentAnalyticsHubPage')
+const ContentAgentReportPage = lazyPage(() => import('@/features/content/ContentAgentReportPage'), 'ContentAgentReportPage')
 const ContentDraftsPage = lazyPage(() => import('@/features/content/ContentDraftsPage'), 'ContentDraftsPage')
-const ContentAnalyticsPage = lazyPage(() => import('@/features/content/ContentAnalyticsPage'), 'ContentAnalyticsPage')
 const SellerOverviewPage = lazyPage(() => import('@/features/seller/SellerOverviewPage'), 'SellerOverviewPage')
 const SellerMarketplacesPage = lazyPage(() => import('@/features/seller/SellerMarketplacesPage'), 'SellerMarketplacesPage')
 const SellerProductsPage = lazyPage(() => import('@/features/seller/SellerProductsPage'), 'SellerProductsPage')
 const SellerInventoryPage = lazyPage(() => import('@/features/seller/SellerInventoryPage'), 'SellerInventoryPage')
 const SellerOrdersPage = lazyPage(() => import('@/features/seller/SellerOrdersPage'), 'SellerOrdersPage')
 const SellerFinancePage = lazyPage(() => import('@/features/seller/SellerFinancePage'), 'SellerFinancePage')
+const SellerPromotionsPage = lazyPage(() => import('@/features/seller/SellerPromotionsPage'), 'SellerPromotionsPage')
 const SellerSeoPage = lazyPage(() => import('@/features/seller/SellerSeoPage'), 'SellerSeoPage')
 const SellerIntelligencePage = lazyPage(() => import('@/features/seller/SellerIntelligencePage'), 'SellerIntelligencePage')
+const SellerAgentReportPage = lazyPage(() => import('@/features/seller/SellerAgentReportPage'), 'SellerAgentReportPage')
 const NotFoundPage = lazyPage(() => import('@/pages/NotFoundPage'), 'NotFoundPage')
 
 function ScrollToTop() {
@@ -110,13 +106,17 @@ function RouteFallback() {
 
 function RequireAuth({ children }: { children: React.ReactElement }) {
   const session = useAuthStore((s) => s.session)
-  const adminAuthed = useAuthStore((s) => s.adminAuthed)
   const location = useLocation()
-  if (!session && !adminAuthed) {
+  if (!session) {
     const next = encodeURIComponent(location.pathname + location.search)
     return <Navigate to={`/login?next=${next}`} replace />
   }
   return children
+}
+
+function ContentWorkspaceRedirect() {
+  const { accountId } = useParams<{ accountId: string }>()
+  return <Navigate to={accountId ? `/app/content/flow?account=${accountId}` : '/app/content/flow'} replace />
 }
 
 export function AppRouter() {
@@ -132,7 +132,7 @@ export function AppRouter() {
           <Route path="/app" element={<RequireAuth><MainLayout /></RequireAuth>}>
             <Route element={<DashboardLayout />}>
               <Route index element={<Navigate to="/app/monitor" replace />} />
-              <Route path="monitor" element={<AgentMonitorPage />} />
+              <Route path="monitor/*" element={<AgentMonitorPage />} />
               <Route path="overview" element={<Navigate to="/app/monitor" replace />} />
               <Route path="assistant" element={<Navigate to="/app/monitor" replace />} />
               <Route path="automations" element={<AutomationsPage />} />
@@ -150,39 +150,25 @@ export function AppRouter() {
               <Route path="finance/reports" element={<FinanceReportsPage />} />
 
               <Route path="content/overview" element={<ContentOverviewPage />} />
-              <Route path="content/accounts" element={<ContentAccountsPage />} />
-              <Route path="content/accounts/:accountId" element={<ContentAccountPage />} />
-              <Route path="content/long-form" element={<ContentFormatLayout />}>
-                <Route index element={<ContentFormatHubPage />} />
-                <Route path="research" element={<ContentResearchPage />} />
-                <Route path="ideas" element={<ContentIdeasPage />} />
-                <Route path="scripts" element={<ContentScriptsPage />} />
-                <Route path="studio" element={<ContentStudioPage />} />
-                <Route path="drafts" element={<ContentDraftsPage />} />
-                <Route path="calendar" element={<ContentCalendarPage />} />
-                <Route path="library" element={<ContentLibraryPage />} />
-                <Route path="analytics" element={<ContentAnalyticsPage />} />
-              </Route>
-              <Route path="content/short-form" element={<ContentFormatLayout />}>
-                <Route index element={<ContentFormatHubPage />} />
-                <Route path="research" element={<ContentResearchPage />} />
-                <Route path="ideas" element={<ContentIdeasPage />} />
-                <Route path="scripts" element={<ContentScriptsPage />} />
-                <Route path="studio" element={<ContentStudioPage />} />
-                <Route path="drafts" element={<ContentDraftsPage />} />
-                <Route path="calendar" element={<ContentCalendarPage />} />
-                <Route path="library" element={<ContentLibraryPage />} />
-                <Route path="analytics" element={<ContentAnalyticsPage />} />
-              </Route>
+              <Route path="content/flow" element={<ContentProductionPage />} />
+              <Route path="content/account" element={<ContentAccountsPage />} />
+              <Route path="content/accounts" element={<Navigate to="/app/content/account" replace />} />
+              <Route path="content/accounts/:accountId" element={<Navigate to="/app/content/analytic" replace />} />
+              <Route path="content/analytic" element={<ContentAnalyticsHubPage />} />
+              <Route path="content/analytics" element={<Navigate to="/app/content/analytic" replace />} />
+              <Route path="content/drafts" element={<ContentDraftsPage />} />
+              <Route path="content/agent-report" element={<ContentAgentReportPage />} />
+              <Route path="content/workspace" element={<Navigate to="/app/content/flow" replace />} />
+              <Route path="content/workspace/:accountId" element={<ContentWorkspaceRedirect />} />
+              <Route path="content/long-form/*" element={<Navigate to="/app/content/flow" replace />} />
+              <Route path="content/short-form/*" element={<Navigate to="/app/content/flow" replace />} />
+              <Route path="content/research" element={<Navigate to="/app/content/flow" replace />} />
+              <Route path="content/ideas" element={<Navigate to="/app/content/flow" replace />} />
+              <Route path="content/scripts" element={<Navigate to="/app/content/flow" replace />} />
+              <Route path="content/studio" element={<Navigate to="/app/content/flow" replace />} />
+              <Route path="content/calendar" element={<Navigate to="/app/content/flow" replace />} />
+              <Route path="content/library" element={<Navigate to="/app/content/flow" replace />} />
               <Route path="content" element={<Navigate to="/app/content/overview" replace />} />
-              <Route path="content/research" element={<Navigate to="/app/content/long-form/research" replace />} />
-              <Route path="content/ideas" element={<Navigate to="/app/content/long-form/ideas" replace />} />
-              <Route path="content/scripts" element={<Navigate to="/app/content/long-form/scripts" replace />} />
-              <Route path="content/studio" element={<Navigate to="/app/content/long-form/studio" replace />} />
-              <Route path="content/drafts" element={<Navigate to="/app/content/long-form/drafts" replace />} />
-              <Route path="content/calendar" element={<Navigate to="/app/content/long-form/calendar" replace />} />
-              <Route path="content/library" element={<Navigate to="/app/content/long-form/library" replace />} />
-              <Route path="content/analytics" element={<Navigate to="/app/content/long-form/analytics" replace />} />
 
               <Route path="seller/overview" element={<SellerOverviewPage />} />
               <Route path="seller/marketplaces" element={<SellerMarketplacesPage />} />
@@ -190,8 +176,10 @@ export function AppRouter() {
               <Route path="seller/inventory" element={<SellerInventoryPage />} />
               <Route path="seller/orders" element={<SellerOrdersPage />} />
               <Route path="seller/finance" element={<SellerFinancePage />} />
+              <Route path="seller/promotions" element={<SellerPromotionsPage />} />
               <Route path="seller/seo" element={<SellerSeoPage />} />
               <Route path="seller/intelligence" element={<SellerIntelligencePage />} />
+              <Route path="seller/agent-report" element={<SellerAgentReportPage />} />
               <Route path="shop/*" element={<Navigate to="/app/seller/overview" replace />} />
             </Route>
           </Route>

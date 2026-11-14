@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog } from '@/components/ui/dialog'
 import { Input, Select } from '@/components/ui/input'
 import { TD, TH, THead, TBody, TR, Table, TableEmpty } from '@/components/ui/table'
-import { MarketplaceBadge, OrderStatusBadge } from '@/features/seller/components/seller-ui'
+import { AccountScope } from '@/features/seller/components/account-scope'
+import { AccountBadge, MarketplaceBadge, OrderStatusBadge } from '@/features/seller/components/seller-ui'
 import { useSellerStore } from '@/stores/seller-store'
 import { useToastStore } from '@/stores/app-store'
 import type { Order } from '@/types'
@@ -16,7 +17,7 @@ import { downloadText, formatDate, formatIDR } from '@/lib/utils'
 const statuses: Order['status'][] = ['Pending', 'Processing', 'Shipped', 'Completed', 'Cancelled', 'Returned']
 
 export function SellerOrdersPage() {
-  const { orders, updateOrderStatus } = useSellerStore()
+  const { orders, connections, updateOrderStatus, activeAccountId } = useSellerStore()
   const { push } = useToastStore()
   const [query, setQuery] = React.useState('')
   const [status, setStatus] = React.useState('all')
@@ -24,19 +25,24 @@ export function SellerOrdersPage() {
   const [selectedId, setSelectedId] = React.useState<string | null>(null)
   const [nextStatus, setNextStatus] = React.useState<Order['status']>('Processing')
 
-  const filtered = orders
+  React.useEffect(() => setMarketplace('all'), [activeAccountId])
+
+  const scopedOrders = activeAccountId === 'all' ? orders : orders.filter((o) => o.accountId === activeAccountId)
+
+  const filtered = scopedOrders
     .filter((o) => status === 'all' || o.status === status)
     .filter((o) => marketplace === 'all' || o.marketplace === marketplace)
     .filter((o) => !query.trim() || `${o.id} ${o.customer} ${o.product}`.toLowerCase().includes(query.toLowerCase()))
     .sort((a, b) => (a.date < b.date ? 1 : -1))
 
-  const selected = orders.find((o) => o.id === selectedId)
+  const selected = scopedOrders.find((o) => o.id === selectedId)
   const totalValue = filtered.reduce((a, o) => a + o.total, 0)
 
   const exportCsv = () => {
-    const header = 'Order,Customer,Product,Qty,Total,Status,Marketplace,Date\n'
+    const header = 'Order,Customer,Product,Qty,Total,Status,Marketplace,Account,Date\n'
+    const accountName = (id: string) => connections.find((c) => c.id === id)?.storeName ?? id
     const body = filtered
-      .map((o) => [o.id, `"${o.customer}"`, `"${o.product}"`, o.qty, o.total, o.status, o.marketplace, o.date].join(','))
+      .map((o) => [o.id, `"${o.customer}"`, `"${o.product}"`, o.qty, o.total, o.status, o.marketplace, `"${accountName(o.accountId)}"`, o.date].join(','))
       .join('\n')
     downloadText(`orders-${new Date().toISOString().slice(0, 10)}.csv`, header + body)
     push({ title: 'Pesanan diekspor', description: `${filtered.length} baris CSV.`, tone: 'success' })
@@ -51,19 +57,22 @@ export function SellerOrdersPage() {
     <div>
       <PageHeader
         title="Pesanan"
-        description="Kelola pesanan dari semua marketplace dengan status yang konsisten."
+        description="Kelola pesanan dari semua akun marketplace dengan status yang konsisten."
         actions={
-          <Button variant="secondary" onClick={exportCsv}>
-            <Download /> Ekspor CSV
-          </Button>
+          <>
+            <AccountScope />
+            <Button variant="secondary" onClick={exportCsv}>
+              <Download /> Ekspor CSV
+            </Button>
+          </>
         }
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Total pesanan" value={`${filtered.length} order`} deltaLabel={formatIDR(totalValue, { compact: true })} icon={<Package />} accent="orange" />
-        <MetricCard label="Perlu diproses" value={`${orders.filter((o) => o.status === 'Pending' || o.status === 'Processing').length} order`} deltaLabel="pending & processing" icon={<Package />} tone="warning" accent="yellow" />
-        <MetricCard label="Dikirim" value={`${orders.filter((o) => o.status === 'Shipped').length} order`} deltaLabel="dalam perjalanan" icon={<Truck />} accent="teal" />
-        <MetricCard label="Selesai" value={`${orders.filter((o) => o.status === 'Completed').length} order`} deltaLabel="completed" icon={<Wallet />} tone="positive" accent="pink" />
+        <MetricCard label="Perlu diproses" value={`${scopedOrders.filter((o) => o.status === 'Pending' || o.status === 'Processing').length} order`} deltaLabel="pending & processing" icon={<Package />} tone="warning" accent="yellow" />
+        <MetricCard label="Dikirim" value={`${scopedOrders.filter((o) => o.status === 'Shipped').length} order`} deltaLabel="dalam perjalanan" icon={<Truck />} accent="teal" />
+        <MetricCard label="Selesai" value={`${scopedOrders.filter((o) => o.status === 'Completed').length} order`} deltaLabel="completed" icon={<Wallet />} tone="positive" accent="pink" />
       </div>
 
       <Card className="mt-4">
@@ -77,11 +86,13 @@ export function SellerOrdersPage() {
               <option value="all">Semua status</option>
               {statuses.map((s) => <option key={s} value={s}>{s}</option>)}
             </Select>
-            <Select value={marketplace} onChange={(e) => setMarketplace(e.target.value)} className="h-9 w-auto min-w-[130px] text-xs">
-              <option value="all">Semua marketplace</option>
-              <option value="TikTok Shop">TikTok Shop</option>
-              <option value="Shopee">Shopee</option>
-            </Select>
+            {activeAccountId === 'all' ? (
+              <Select value={marketplace} onChange={(e) => setMarketplace(e.target.value)} className="h-9 w-auto min-w-[130px] text-xs">
+                <option value="all">Semua marketplace</option>
+                <option value="TikTok Shop">TikTok Shop</option>
+                <option value="Shopee">Shopee</option>
+              </Select>
+            ) : null}
           </div>
         </div>
 
@@ -92,6 +103,7 @@ export function SellerOrdersPage() {
               <TH className="hidden sm:table-cell">Pelanggan</TH>
               <TH>Produk</TH>
               <TH className="hidden md:table-cell">Marketplace</TH>
+              <TH className="hidden lg:table-cell">Akun</TH>
               <TH>Status</TH>
               <TH className="text-right">Total</TH>
               <TH className="w-10" />
@@ -99,7 +111,7 @@ export function SellerOrdersPage() {
           </THead>
           <TBody>
             {filtered.length === 0 ? (
-              <TableEmpty colSpan={7}>Tidak ada pesanan yang cocok.</TableEmpty>
+              <TableEmpty colSpan={8}>Tidak ada pesanan yang cocok.</TableEmpty>
             ) : (
               filtered.map((o) => (
                 <TR key={o.id} className="cursor-pointer" onClick={() => openDetail(o)}>
@@ -113,6 +125,7 @@ export function SellerOrdersPage() {
                     <p className="text-[9px] text-text-muted">{o.qty} unit</p>
                   </TD>
                   <TD className="hidden md:table-cell"><MarketplaceBadge marketplace={o.marketplace} /></TD>
+                  <TD className="hidden lg:table-cell"><AccountBadge accountId={o.accountId} /></TD>
                   <TD><OrderStatusBadge status={o.status} /></TD>
                   <TD className="text-right"><span className="num text-[11px] text-text-primary">{formatIDR(o.total)}</span></TD>
                   <TD><ChevronRight className="size-3.5 text-text-muted" /></TD>
@@ -181,6 +194,7 @@ export function SellerOrdersPage() {
             </div>
             <div className="flex flex-wrap gap-1.5">
               <Badge tone="outline">Marketplace: {selected.marketplace}</Badge>
+              <AccountBadge accountId={selected.accountId} />
               <Badge tone="outline">Qty: {selected.qty}</Badge>
             </div>
           </div>

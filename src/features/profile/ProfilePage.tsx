@@ -116,7 +116,7 @@ export function ProfilePage() {
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="text-[20px] font-semibold tracking-tight text-text-primary">{user.name}</h2>
-                <Badge tone="primary">{user.plan}</Badge>
+                <Badge tone="info">Studio</Badge>
               </div>
               <p className="text-[12px] text-text-secondary">{user.role}</p>
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-text-muted">

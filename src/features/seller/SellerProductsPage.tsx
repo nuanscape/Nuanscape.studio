@@ -8,16 +8,18 @@ import { Input, Select } from '@/components/ui/input'
 import { TD, TH, THead, TBody, TR, Table, TableEmpty } from '@/components/ui/table'
 import { DropdownItem, DropdownMenu } from '@/components/ui/dropdown'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { MarketplaceBadge, StockBar, StockBadge } from '@/features/seller/components/seller-ui'
+import { AccountScope } from '@/features/seller/components/account-scope'
+import { AccountCount, MarketplaceBadge, StockBar, StockBadge } from '@/features/seller/components/seller-ui'
 import { ProductModal } from '@/features/seller/components/product-modal'
 import { useSellerStore } from '@/stores/seller-store'
 import { useToastStore } from '@/stores/app-store'
 import { productMargin } from '@/lib/metrics'
+import { effectivePrice } from '@/lib/seller-ledger'
 import { cn, formatIDR, formatPercent } from '@/lib/utils'
 import type { Product } from '@/types'
 
 export function SellerProductsPage() {
-  const { products, deleteProduct, restockProduct } = useSellerStore()
+  const { products, connections, activeAccountId, deleteProduct, restockProduct } = useSellerStore()
   const { push } = useToastStore()
   const [open, setOpen] = React.useState(false)
   const [editing, setEditing] = React.useState<Product | undefined>()
@@ -28,8 +30,18 @@ export function SellerProductsPage() {
   const [page, setPage] = React.useState(1)
   const perPage = 8
 
-  const filtered = products
-    .filter((p) => marketplace === 'all' || p.marketplace === marketplace)
+  React.useEffect(() => { setMarketplace('all'); setPage(1) }, [activeAccountId])
+
+  const scopedProducts = activeAccountId === 'all'
+    ? products
+    : products.filter((p) => {
+        if (p.accountIds?.length) return p.accountIds.includes(activeAccountId)
+        const platform = connections.find((c) => c.id === activeAccountId)?.name
+        return Boolean(platform) && (p.marketplace === platform || p.marketplace === 'Both')
+      })
+
+  const filtered = scopedProducts
+    .filter((p) => marketplace === 'all' || p.marketplace === 'Both' || p.marketplace === marketplace)
     .filter((p) => {
       if (stockFilter === 'low') return p.stock > 0 && p.stock <= p.minStock
       if (stockFilter === 'out') return p.stock === 0
@@ -42,9 +54,9 @@ export function SellerProductsPage() {
   const currentPage = Math.min(page, totalPages)
   const rows = filtered.slice((currentPage - 1) * perPage, currentPage * perPage)
 
-  const inventoryValue = products.reduce((a, p) => a + p.cost * p.stock, 0)
-  const lowStock = products.filter((p) => p.stock > 0 && p.stock <= p.minStock)
-  const outOfStock = products.filter((p) => p.stock === 0)
+  const inventoryValue = scopedProducts.reduce((a, p) => a + p.cost * p.stock, 0)
+  const lowStock = scopedProducts.filter((p) => p.stock > 0 && p.stock <= p.minStock)
+  const outOfStock = scopedProducts.filter((p) => p.stock === 0)
 
   const restock = (p: Product) => {
     restockProduct(p.id, Math.max(p.minStock * 2, 20))
@@ -57,15 +69,18 @@ export function SellerProductsPage() {
         title="Produk"
         description="Kelola katalog, harga, HPP, dan margin lintas marketplace."
         actions={
-          <Button onClick={() => { setEditing(undefined); setOpen(true) }}>
-            <Plus /> Tambah produk
-          </Button>
+          <>
+            <AccountScope />
+            <Button onClick={() => { setEditing(undefined); setOpen(true) }}>
+              <Plus /> Tambah produk
+            </Button>
+          </>
         }
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Total produk" value={`${products.length} SKU`} deltaLabel={`${products.filter((p) => p.status === 'Active').length} aktif`} icon={<Package />} accent="orange" />
-        <MetricCard label="Nilai inventory" value={formatIDR(inventoryValue)} deltaLabel={`${products.reduce((a, p) => a + p.stock, 0)} unit`} icon={<Boxes />} accent="yellow" />
+        <MetricCard label="Total produk" value={`${scopedProducts.length} SKU`} deltaLabel={`${scopedProducts.filter((p) => p.status === 'Active').length} aktif`} icon={<Package />} accent="orange" />
+        <MetricCard label="Nilai inventory" value={formatIDR(inventoryValue)} deltaLabel={`${scopedProducts.reduce((a, p) => a + p.stock, 0)} unit`} icon={<Boxes />} accent="yellow" />
         <MetricCard label="Stok rendah" value={`${lowStock.length} produk`} deltaLabel="di bawah minimum" icon={<TrendingUp />} tone="warning" accent="teal" />
         <MetricCard label="Stok habis" value={`${outOfStock.length} produk`} deltaLabel="tidak bisa dijual" icon={<Package />} tone={outOfStock.length ? 'danger' : 'default'} accent="pink" />
       </div>
@@ -86,7 +101,6 @@ export function SellerProductsPage() {
               <option value="all">Semua marketplace</option>
               <option value="TikTok Shop">TikTok Shop</option>
               <option value="Shopee">Shopee</option>
-              <option value="Both">Both</option>
             </Select>
             <Select value={stockFilter} onChange={(e) => { setStockFilter(e.target.value); setPage(1) }} className="h-9 w-auto min-w-[120px] text-xs">
               <option value="all">Semua stok</option>
@@ -102,6 +116,7 @@ export function SellerProductsPage() {
             <TR>
               <TH>Produk</TH>
               <TH className="hidden md:table-cell">Marketplace</TH>
+              <TH className="hidden xl:table-cell">Akun</TH>
               <TH>Harga / HPP</TH>
               <TH className="hidden sm:table-cell">Margin</TH>
               <TH>Stok</TH>
@@ -111,7 +126,7 @@ export function SellerProductsPage() {
           </THead>
           <TBody>
             {rows.length === 0 ? (
-              <TableEmpty colSpan={7}>Tidak ada produk yang cocok.</TableEmpty>
+              <TableEmpty colSpan={8}>Tidak ada produk yang cocok.</TableEmpty>
             ) : (
               rows.map((p) => {
                 const margin = productMargin(p)
@@ -124,9 +139,15 @@ export function SellerProductsPage() {
                       </div>
                     </TD>
                     <TD className="hidden md:table-cell"><MarketplaceBadge marketplace={p.marketplace} /></TD>
+                    <TD className="hidden xl:table-cell"><AccountCount accountIds={p.accountIds} /></TD>
                     <TD>
-                      <p className="num text-[11px] text-text-primary">{formatIDR(p.price)}</p>
-                      <p className="text-[9px] text-text-muted">HPP {formatIDR(p.cost, { compact: true })}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="num text-[11px] text-text-primary">{formatIDR(effectivePrice(p))}</p>
+                        {p.discountPct ? <Badge tone="primary">-{p.discountPct}%</Badge> : null}
+                      </div>
+                      <p className="text-[9px] text-text-muted">
+                        {p.discountPct ? <span className="line-through">{formatIDR(p.price)}</span> : 'HPP'} {p.discountPct ? '' : formatIDR(p.cost, { compact: true })}
+                      </p>
                     </TD>
                     <TD className="hidden sm:table-cell">
                       <span className={cn('num text-[11px]', margin.pct >= 45 ? 'text-primary' : margin.pct >= 30 ? 'text-text-primary' : 'text-warning')}>
@@ -184,7 +205,7 @@ export function SellerProductsPage() {
           }
         }}
         title="Hapus produk?"
-        description={toDelete ? `“${toDelete.name}” akan dihapus dari katalog lokal.` : undefined}
+        description={toDelete ? `${toDelete.name} akan dihapus dari katalog lokal.` : undefined}
         confirmLabel="Hapus produk"
       />
     </div>

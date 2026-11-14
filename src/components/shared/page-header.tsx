@@ -25,16 +25,16 @@ export function PageHeader({
   className?: string
 }) {
   return (
-    <div className={cn('mb-6 flex flex-col gap-5 sm:mb-8 sm:flex-row sm:items-end sm:justify-between', className)}>
+    <div className={cn('mb-5 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-end sm:justify-between', className)}>
       <div className="min-w-0">
-        <h1 className="text-balance text-[30px] font-extrabold leading-[0.98] tracking-[-0.045em] text-white sm:text-[38px]">
+        <h1 className="text-balance text-[28px] font-extrabold leading-[0.98] tracking-[-0.045em] text-white sm:text-[38px]">
           {title}
         </h1>
         {description ? (
           <p className="mt-2.5 max-w-2xl text-[12.5px] leading-relaxed text-white/48">{description}</p>
         ) : null}
       </div>
-      {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+      {actions ? <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">{actions}</div> : null}
     </div>
   )
 }
@@ -51,12 +51,12 @@ export function SectionHeader({
   className?: string
 }) {
   return (
-    <div className={cn('mb-3.5 flex items-end justify-between gap-3', className)}>
-      <div>
+    <div className={cn('mb-3.5 flex flex-wrap items-end justify-between gap-3', className)}>
+      <div className="min-w-0">
         <h2 className="text-[15px] font-bold tracking-[-0.025em] text-white">{title}</h2>
         {description ? <p className="mt-0.5 text-[11px] leading-relaxed text-white/40">{description}</p> : null}
       </div>
-      {action}
+      {action ? <div className="shrink-0">{action}</div> : null}
     </div>
   )
 }

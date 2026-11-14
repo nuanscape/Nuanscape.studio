@@ -78,6 +78,7 @@ export interface PlatformAccount {
   completionRate: number
   status: 'Active' | 'Growing' | 'Paused'
   lastSync: string
+  linked?: boolean
 }
 
 export interface ContentItem {
@@ -93,8 +94,15 @@ export interface ContentItem {
   engagement: number
   script?: string
   thumbnail?: string
+  previewUrl?: string
+  videoUrl?: string
   caption?: string
+  thumbnailStyle?: string
+  animationStyle?: string
+  musicStyle?: string
   hashtags?: string[]
+  generated?: boolean
+  sourceIdeaId?: string
   createdAt: string
 }
 
@@ -109,6 +117,7 @@ export interface ContentIdea {
   format: string
   score: number
   approved?: boolean
+  rejected?: boolean
 }
 
 export interface LibraryAsset {
@@ -133,6 +142,8 @@ export interface Product {
   minStock: number
   sold: number
   marketplace: 'TikTok Shop' | 'Shopee' | 'Both'
+  accountIds?: string[]
+  discountPct?: number
   seoScore: number
   geoScore: number
   status: 'Active' | 'Paused' | 'Out of Stock'
@@ -156,6 +167,7 @@ export interface Order {
   total: number
   status: 'Pending' | 'Processing' | 'Shipped' | 'Completed' | 'Cancelled' | 'Returned'
   marketplace: 'TikTok Shop' | 'Shopee'
+  accountId: string
   date: string
 }
 
@@ -167,6 +179,79 @@ export interface MarketplaceConnection {
   lastSync: string
   permissions: string[]
   note?: string
+}
+
+export type PromoStatus = 'active' | 'paused' | 'scheduled' | 'ended'
+
+export interface Voucher {
+  id: string
+  code: string
+  title: string
+  accountId: string
+  marketplace: 'TikTok Shop' | 'Shopee'
+  kind: 'percent' | 'fixed' | 'shipping'
+  value: number
+  minSpend: number
+  quota: number
+  used: number
+  startDate: string
+  endDate: string
+  status: PromoStatus
+}
+
+export interface FlashSale {
+  id: string
+  title: string
+  accountId: string
+  marketplace: 'TikTok Shop' | 'Shopee'
+  productId: string
+  discountPct: number
+  quota: number
+  sold: number
+  startDate: string
+  endDate: string
+  status: PromoStatus
+}
+
+export interface AdCampaign {
+  id: string
+  name: string
+  accountId: string
+  marketplace: 'TikTok Shop' | 'Shopee'
+  objective: 'Sales' | 'Traffic' | 'Live'
+  budget: number
+  spend: number
+  revenue: number
+  impressions: number
+  clicks: number
+  conversions: number
+  startDate: string
+  endDate: string
+  status: PromoStatus
+}
+
+export type LedgerType =
+  | 'income'
+  | 'discount'
+  | 'refund'
+  | 'platform_fee'
+  | 'affiliate_fee'
+  | 'shipping'
+  | 'cogs'
+  | 'ads'
+  | 'opex'
+
+export interface LedgerEntry {
+  id: string
+  date: string
+  accountId: string
+  marketplace: 'TikTok Shop' | 'Shopee'
+  type: LedgerType
+  label: string
+  detail?: string
+  amount: number
+  productId?: string
+  ref?: string
 }
 
 export interface AppNotification {

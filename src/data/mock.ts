@@ -1,4 +1,5 @@
 import type {
+  AdCampaign,
   AIInsight,
   AppNotification,
   AssetItem,
@@ -7,6 +8,7 @@ import type {
   ContentIdea,
   ContentItem,
   FinanceSeriesPoint,
+  FlashSale,
   Goal,
   LibraryAsset,
   LiabilityItem,
@@ -16,6 +18,7 @@ import type {
   PlatformAccount,
   Product,
   Transaction,
+  Voucher,
 } from '@/types'
 import { dateOffset, daysFromNow } from '@/lib/utils'
 
@@ -24,7 +27,7 @@ export const currentUser = {
   email: 'reza@nuanscape-studio.app',
   role: 'Founder & Creator',
   initials: 'MR',
-  plan: 'Pro',
+  plan: 'Demo',
   timezone: 'Asia/Jakarta',
   joinedAt: '2025-08-14',
 }
@@ -427,7 +430,7 @@ export const platformAccounts: PlatformAccount[] = [
     format: 'long',
     name: 'Muhe Studio',
     handle: '@muhestudio',
-    niche: 'AI & produktivitas',
+    niche: 'Lofi & study mix',
     followers: 128400,
     posts30d: 8,
     views30d: 1820000,
@@ -443,7 +446,7 @@ export const platformAccounts: PlatformAccount[] = [
     format: 'long',
     name: 'Muhe Chill',
     handle: '@muhechill',
-    niche: 'Lofi & study mix',
+    niche: 'Retro & synthwave',
     followers: 64200,
     posts30d: 12,
     views30d: 964000,
@@ -454,12 +457,28 @@ export const platformAccounts: PlatformAccount[] = [
     lastSync: daysFromNow(0, 8),
   },
   {
+    id: 'yt-labs',
+    platform: 'YouTube',
+    format: 'long',
+    name: 'Muhe Labs',
+    handle: '@muhelabs',
+    niche: 'Hip-Hop & boom bap',
+    followers: 41800,
+    posts30d: 6,
+    views30d: 423000,
+    engagement: 4.6,
+    avgWatchMinutes: 9.1,
+    completionRate: 48,
+    status: 'Growing',
+    lastSync: daysFromNow(0, 7),
+  },
+  {
     id: 'tt-muhe',
     platform: 'TikTok',
     format: 'short',
     name: 'Muhe Daily',
     handle: '@muhe.id',
-    niche: 'Agentic AI',
+    niche: 'Lofi snippets',
     followers: 214000,
     posts30d: 22,
     views30d: 2410000,
@@ -475,7 +494,7 @@ export const platformAccounts: PlatformAccount[] = [
     format: 'short',
     name: 'Muhe Clips',
     handle: '@muhe.clips',
-    niche: 'AI tips & tools',
+    niche: 'Retro edits',
     followers: 38600,
     posts30d: 15,
     views30d: 512000,
@@ -486,12 +505,28 @@ export const platformAccounts: PlatformAccount[] = [
     lastSync: daysFromNow(-1, 14),
   },
   {
+    id: 'tt-notes',
+    platform: 'TikTok',
+    format: 'short',
+    name: 'Muhe Notes',
+    handle: '@muhe.notes',
+    niche: 'Boom bap cuts',
+    followers: 92700,
+    posts30d: 18,
+    views30d: 1280000,
+    engagement: 10.1,
+    avgWatchMinutes: 0.6,
+    completionRate: 35,
+    status: 'Active',
+    lastSync: daysFromNow(0, 6),
+  },
+  {
     id: 'ig-muhe',
     platform: 'Instagram',
     format: 'short',
     name: 'Muhe Co',
     handle: '@muhe.co',
-    niche: 'Workspace & AI',
+    niche: 'Lofi visual',
     followers: 52400,
     posts30d: 14,
     views30d: 688000,
@@ -507,7 +542,7 @@ export const platformAccounts: PlatformAccount[] = [
     format: 'short',
     name: 'Muhe Lab',
     handle: '@muhe.lab',
-    niche: 'Behind the scene',
+    niche: 'Retro aesthetic',
     followers: 12800,
     posts30d: 9,
     views30d: 148000,
@@ -517,12 +552,30 @@ export const platformAccounts: PlatformAccount[] = [
     status: 'Paused',
     lastSync: daysFromNow(-3, 16),
   },
+  {
+    id: 'ig-reels',
+    platform: 'Instagram',
+    format: 'short',
+    name: 'Muhe Reels',
+    handle: '@muhe.reels',
+    niche: 'Hip-Hop reels',
+    followers: 27900,
+    posts30d: 11,
+    views30d: 356000,
+    engagement: 7.9,
+    avgWatchMinutes: 0.35,
+    completionRate: 32,
+    status: 'Growing',
+    lastSync: daysFromNow(0, 5),
+  },
 ]
 
+export const MAX_ACCOUNTS_PER_PLATFORM = 3
+
 const accountPools: Record<Platform, string[]> = {
-  YouTube: ['yt-muhe', 'yt-chill'],
-  TikTok: ['tt-muhe', 'tt-clips'],
-  Instagram: ['ig-muhe', 'ig-lab'],
+  YouTube: ['yt-muhe', 'yt-chill', 'yt-labs'],
+  TikTok: ['tt-muhe', 'tt-clips', 'tt-notes'],
+  Instagram: ['ig-muhe', 'ig-lab', 'ig-reels'],
 }
 
 function attachAccountIds<T extends { id: string; platform: Platform; accountId?: string }>(rows: T[]) {
@@ -555,18 +608,18 @@ export const platformBreakdown = [
 ]
 
 export const products: Product[] = [
-  { id: 'p1', sku: 'LM-LAMP-01', name: 'Lofi Study Lamp', category: 'Lighting', price: 189000, cost: 98000, stock: 6, minStock: 10, sold: 342, marketplace: 'Both', seoScore: 88, geoScore: 82, status: 'Active', createdAt: daysFromNow(-90) },
-  { id: 'p2', sku: 'DK-DESK-02', name: 'Minimal Desk Organizer', category: 'Workspace', price: 149000, cost: 72000, stock: 48, minStock: 15, sold: 286, marketplace: 'Shopee', seoScore: 76, geoScore: 71, status: 'Active', createdAt: daysFromNow(-84) },
-  { id: 'p3', sku: 'MC-MOUSE-03', name: 'Silent Click Mouse Pro', category: 'Electronics', price: 229000, cost: 132000, stock: 31, minStock: 10, sold: 198, marketplace: 'TikTok Shop', seoScore: 92, geoScore: 86, status: 'Active', createdAt: daysFromNow(-70) },
-  { id: 'p4', sku: 'HP-HUB-04', name: 'USB-C Hub 7-in-1', category: 'Electronics', price: 279000, cost: 168000, stock: 4, minStock: 12, sold: 174, marketplace: 'Both', seoScore: 69, geoScore: 64, status: 'Active', createdAt: daysFromNow(-65) },
-  { id: 'p5', sku: 'NB-STAND-05', name: 'Aluminum Laptop Stand', category: 'Workspace', price: 199000, cost: 104000, stock: 62, minStock: 20, sold: 309, marketplace: 'TikTok Shop', seoScore: 85, geoScore: 79, status: 'Active', createdAt: daysFromNow(-120) },
-  { id: 'p6', sku: 'CB-CABLE-06', name: 'Braided USB-C Cable 2m', category: 'Accessories', price: 89000, cost: 38000, stock: 0, minStock: 25, sold: 421, marketplace: 'Shopee', seoScore: 74, geoScore: 68, status: 'Out of Stock', createdAt: daysFromNow(-150) },
-  { id: 'p7', sku: 'KB-MECH-07', name: 'Mech Keyboard 65%', category: 'Electronics', price: 649000, cost: 412000, stock: 17, minStock: 8, sold: 86, marketplace: 'Both', seoScore: 91, geoScore: 88, status: 'Active', createdAt: daysFromNow(-55) },
-  { id: 'p8', sku: 'MT-PAD-08', name: 'Extended Desk Mat', category: 'Workspace', price: 129000, cost: 58000, stock: 88, minStock: 20, sold: 264, marketplace: 'Shopee', seoScore: 81, geoScore: 74, status: 'Active', createdAt: daysFromNow(-110) },
-  { id: 'p9', sku: 'RB-RING-09', name: 'Ring Light Mini', category: 'Lighting', price: 159000, cost: 84000, stock: 22, minStock: 10, sold: 132, marketplace: 'TikTok Shop', seoScore: 66, geoScore: 61, status: 'Paused', createdAt: daysFromNow(-48) },
-  { id: 'p10', sku: 'BT-BOTTLE-10', name: 'Smart Tumbler 500ml', category: 'Lifestyle', price: 139000, cost: 61000, stock: 74, minStock: 20, sold: 238, marketplace: 'TikTok Shop', seoScore: 79, geoScore: 77, status: 'Active', createdAt: daysFromNow(-38) },
-  { id: 'p11', sku: 'WR-WATCH-11', name: 'Digital Desk Clock', category: 'Workspace', price: 119000, cost: 54000, stock: 9, minStock: 12, sold: 147, marketplace: 'Shopee', seoScore: 72, geoScore: 69, status: 'Active', createdAt: daysFromNow(-30) },
-  { id: 'p12', sku: 'PH-POUCH-12', name: 'Tech Organizer Pouch', category: 'Accessories', price: 99000, cost: 41000, stock: 53, minStock: 15, sold: 192, marketplace: 'Both', seoScore: 84, geoScore: 80, status: 'Active', createdAt: daysFromNow(-24) },
+  { id: 'p1', sku: 'LM-LAMP-01', name: 'Lofi Study Lamp', category: 'Lighting', price: 189000, cost: 98000, stock: 6, minStock: 10, sold: 342, marketplace: 'Both', accountIds: ['mc1', 'mc3', 'mc2', 'mc5'], seoScore: 88, geoScore: 82, status: 'Active', createdAt: daysFromNow(-90) },
+  { id: 'p2', sku: 'DK-DESK-02', name: 'Minimal Desk Organizer', category: 'Workspace', price: 149000, cost: 72000, stock: 48, minStock: 15, sold: 286, marketplace: 'Shopee', accountIds: ['mc2', 'mc5'], discountPct: 10, seoScore: 76, geoScore: 71, status: 'Active', createdAt: daysFromNow(-84) },
+  { id: 'p3', sku: 'MC-MOUSE-03', name: 'Silent Click Mouse Pro', category: 'Electronics', price: 229000, cost: 132000, stock: 31, minStock: 10, sold: 198, marketplace: 'TikTok Shop', accountIds: ['mc1', 'mc4'], seoScore: 92, geoScore: 86, status: 'Active', createdAt: daysFromNow(-70) },
+  { id: 'p4', sku: 'HP-HUB-04', name: 'USB-C Hub 7-in-1', category: 'Electronics', price: 279000, cost: 168000, stock: 4, minStock: 12, sold: 174, marketplace: 'Both', accountIds: ['mc1', 'mc3', 'mc2', 'mc5'], seoScore: 69, geoScore: 64, status: 'Active', createdAt: daysFromNow(-65) },
+  { id: 'p5', sku: 'NB-STAND-05', name: 'Aluminum Laptop Stand', category: 'Workspace', price: 199000, cost: 104000, stock: 62, minStock: 20, sold: 309, marketplace: 'TikTok Shop', accountIds: ['mc3', 'mc4'], seoScore: 85, geoScore: 79, status: 'Active', createdAt: daysFromNow(-120) },
+  { id: 'p6', sku: 'CB-CABLE-06', name: 'Braided USB-C Cable 2m', category: 'Accessories', price: 89000, cost: 38000, stock: 0, minStock: 25, sold: 421, marketplace: 'Shopee', accountIds: ['mc2', 'mc6'], discountPct: 15, seoScore: 74, geoScore: 68, status: 'Out of Stock', createdAt: daysFromNow(-150) },
+  { id: 'p7', sku: 'KB-MECH-07', name: 'Mech Keyboard 65%', category: 'Electronics', price: 649000, cost: 412000, stock: 17, minStock: 8, sold: 86, marketplace: 'Both', accountIds: ['mc1', 'mc4', 'mc5'], seoScore: 91, geoScore: 88, status: 'Active', createdAt: daysFromNow(-55) },
+  { id: 'p8', sku: 'MT-PAD-08', name: 'Extended Desk Mat', category: 'Workspace', price: 129000, cost: 58000, stock: 88, minStock: 20, sold: 264, marketplace: 'Shopee', accountIds: ['mc5', 'mc6'], discountPct: 5, seoScore: 81, geoScore: 74, status: 'Active', createdAt: daysFromNow(-110) },
+  { id: 'p9', sku: 'RB-RING-09', name: 'Ring Light Mini', category: 'Lighting', price: 159000, cost: 84000, stock: 22, minStock: 10, sold: 132, marketplace: 'TikTok Shop', accountIds: ['mc1', 'mc3'], discountPct: 20, seoScore: 66, geoScore: 61, status: 'Paused', createdAt: daysFromNow(-48) },
+  { id: 'p10', sku: 'BT-BOTTLE-10', name: 'Smart Tumbler 500ml', category: 'Lifestyle', price: 139000, cost: 61000, stock: 74, minStock: 20, sold: 238, marketplace: 'TikTok Shop', accountIds: ['mc3', 'mc4'], seoScore: 79, geoScore: 77, status: 'Active', createdAt: daysFromNow(-38) },
+  { id: 'p11', sku: 'WR-WATCH-11', name: 'Digital Desk Clock', category: 'Workspace', price: 119000, cost: 54000, stock: 9, minStock: 12, sold: 147, marketplace: 'Shopee', accountIds: ['mc2', 'mc6'], seoScore: 72, geoScore: 69, status: 'Active', createdAt: daysFromNow(-30) },
+  { id: 'p12', sku: 'PH-POUCH-12', name: 'Tech Organizer Pouch', category: 'Accessories', price: 99000, cost: 41000, stock: 53, minStock: 15, sold: 192, marketplace: 'Both', accountIds: ['mc1', 'mc2', 'mc5'], seoScore: 84, geoScore: 80, status: 'Active', createdAt: daysFromNow(-24) },
 ]
 
 export const inventoryMovements = [
@@ -583,20 +636,49 @@ export const inventoryMovements = [
 ]
 
 export const orders: Order[] = [
-  { id: 'SO-2411-0912', customer: 'Dewi Lestari', product: 'Lofi Study Lamp', qty: 2, total: 378000, status: 'Completed', marketplace: 'TikTok Shop', date: daysFromNow(-1, 10) },
-  { id: 'SP-2411-4471', customer: 'Andi Pratama', product: 'Aluminum Laptop Stand', qty: 1, total: 199000, status: 'Shipped', marketplace: 'Shopee', date: daysFromNow(-1, 12) },
-  { id: 'SO-2411-0908', customer: 'Rina Kusuma', product: 'Silent Click Mouse Pro', qty: 1, total: 229000, status: 'Processing', marketplace: 'TikTok Shop', date: daysFromNow(-1, 14) },
-  { id: 'SP-2411-4468', customer: 'Budi Santoso', product: 'Extended Desk Mat', qty: 3, total: 387000, status: 'Completed', marketplace: 'Shopee', date: daysFromNow(-2, 9) },
-  { id: 'SO-2411-0901', customer: 'Maya Sari', product: 'Mech Keyboard 65%', qty: 1, total: 649000, status: 'Completed', marketplace: 'TikTok Shop', date: daysFromNow(-2, 11) },
-  { id: 'SP-2411-4460', customer: 'Fajar Nugroho', product: 'Minimal Desk Organizer', qty: 2, total: 298000, status: 'Returned', marketplace: 'Shopee', date: daysFromNow(-3, 15) },
-  { id: 'SO-2411-0896', customer: 'Siti Aminah', product: 'Braided USB-C Cable 2m', qty: 4, total: 356000, status: 'Cancelled', marketplace: 'TikTok Shop', date: daysFromNow(-3, 16) },
-  { id: 'SP-2411-4452', customer: 'Rizky Maulana', product: 'Smart Tumbler 500ml', qty: 2, total: 278000, status: 'Completed', marketplace: 'Shopee', date: daysFromNow(-4, 10) },
-  { id: 'SO-2411-0884', customer: 'Intan Permata', product: 'Lofi Study Lamp', qty: 1, total: 189000, status: 'Completed', marketplace: 'TikTok Shop', date: daysFromNow(-4, 13) },
-  { id: 'SP-2411-4447', customer: 'Agus Setiawan', product: 'USB-C Hub 7-in-1', qty: 1, total: 279000, status: 'Shipped', marketplace: 'Shopee', date: daysFromNow(-5, 9) },
-  { id: 'SO-2411-0879', customer: 'Nadia Putri', product: 'Tech Organizer Pouch', qty: 2, total: 198000, status: 'Pending', marketplace: 'TikTok Shop', date: daysFromNow(-5, 17) },
-  { id: 'SP-2411-4439', customer: 'Hendra Wijaya', product: 'Digital Desk Clock', qty: 1, total: 119000, status: 'Completed', marketplace: 'Shopee', date: daysFromNow(-6, 12) },
-  { id: 'SO-2411-0871', customer: 'Lia Anggraini', product: 'Ring Light Mini', qty: 1, total: 159000, status: 'Completed', marketplace: 'TikTok Shop', date: daysFromNow(-6, 14) },
-  { id: 'SP-2411-4432', customer: 'Yoga Pratama', product: 'Extended Desk Mat', qty: 1, total: 129000, status: 'Processing', marketplace: 'Shopee', date: daysFromNow(-7, 10) },
+  { id: 'SO-2411-0912', customer: 'Dewi Lestari', product: 'Lofi Study Lamp', qty: 2, total: 378000, status: 'Completed', marketplace: 'TikTok Shop', accountId: 'mc1', date: daysFromNow(-1, 10) },
+  { id: 'SP-2411-4471', customer: 'Andi Pratama', product: 'Aluminum Laptop Stand', qty: 1, total: 199000, status: 'Shipped', marketplace: 'Shopee', accountId: 'mc5', date: daysFromNow(-1, 12) },
+  { id: 'SO-2411-0908', customer: 'Rina Kusuma', product: 'Silent Click Mouse Pro', qty: 1, total: 229000, status: 'Processing', marketplace: 'TikTok Shop', accountId: 'mc1', date: daysFromNow(-1, 14) },
+  { id: 'SP-2411-4468', customer: 'Budi Santoso', product: 'Extended Desk Mat', qty: 3, total: 387000, status: 'Completed', marketplace: 'Shopee', accountId: 'mc5', date: daysFromNow(-2, 9) },
+  { id: 'SO-2411-0901', customer: 'Maya Sari', product: 'Mech Keyboard 65%', qty: 1, total: 649000, status: 'Completed', marketplace: 'TikTok Shop', accountId: 'mc1', date: daysFromNow(-2, 11) },
+  { id: 'SP-2411-4460', customer: 'Fajar Nugroho', product: 'Minimal Desk Organizer', qty: 2, total: 298000, status: 'Returned', marketplace: 'Shopee', accountId: 'mc2', date: daysFromNow(-3, 15) },
+  { id: 'SO-2411-0896', customer: 'Siti Aminah', product: 'Braided USB-C Cable 2m', qty: 4, total: 356000, status: 'Cancelled', marketplace: 'TikTok Shop', accountId: 'mc3', date: daysFromNow(-3, 16) },
+  { id: 'SP-2411-4452', customer: 'Rizky Maulana', product: 'Smart Tumbler 500ml', qty: 2, total: 278000, status: 'Completed', marketplace: 'Shopee', accountId: 'mc2', date: daysFromNow(-4, 10) },
+  { id: 'SO-2411-0884', customer: 'Intan Permata', product: 'Lofi Study Lamp', qty: 1, total: 189000, status: 'Completed', marketplace: 'TikTok Shop', accountId: 'mc3', date: daysFromNow(-4, 13) },
+  { id: 'SP-2411-4447', customer: 'Agus Setiawan', product: 'USB-C Hub 7-in-1', qty: 1, total: 279000, status: 'Shipped', marketplace: 'Shopee', accountId: 'mc5', date: daysFromNow(-5, 9) },
+  { id: 'SO-2411-0879', customer: 'Nadia Putri', product: 'Tech Organizer Pouch', qty: 2, total: 198000, status: 'Pending', marketplace: 'TikTok Shop', accountId: 'mc1', date: daysFromNow(-5, 17) },
+  { id: 'SP-2411-4439', customer: 'Hendra Wijaya', product: 'Digital Desk Clock', qty: 1, total: 119000, status: 'Completed', marketplace: 'Shopee', accountId: 'mc2', date: daysFromNow(-6, 12) },
+  { id: 'SO-2411-0871', customer: 'Lia Anggraini', product: 'Ring Light Mini', qty: 1, total: 159000, status: 'Completed', marketplace: 'TikTok Shop', accountId: 'mc3', date: daysFromNow(-6, 14) },
+  { id: 'SP-2411-4432', customer: 'Yoga Pratama', product: 'Extended Desk Mat', qty: 1, total: 129000, status: 'Processing', marketplace: 'Shopee', accountId: 'mc5', date: daysFromNow(-7, 10) },
+]
+
+export const vouchers: Voucher[] = [
+  { id: 'v1', code: 'STUDIOGRATIS', title: 'Gratis ongkir studio', accountId: 'mc1', marketplace: 'TikTok Shop', kind: 'shipping', value: 12000, minSpend: 150000, quota: 200, used: 84, startDate: daysFromNow(-6), endDate: daysFromNow(8), status: 'active' },
+  { id: 'v2', code: 'STUDIO10', title: 'Diskon 10% pembelian pertama', accountId: 'mc1', marketplace: 'TikTok Shop', kind: 'percent', value: 10, minSpend: 200000, quota: 150, used: 61, startDate: daysFromNow(-10), endDate: daysFromNow(4), status: 'active' },
+  { id: 'v3', code: 'HOMELIVING25', title: 'Potongan Rp25.000 home living', accountId: 'mc3', marketplace: 'TikTok Shop', kind: 'fixed', value: 25000, minSpend: 250000, quota: 100, used: 38, startDate: daysFromNow(-4), endDate: daysFromNow(10), status: 'active' },
+  { id: 'v4', code: 'NEWBUYER15', title: 'Voucher pembeli baru', accountId: 'mc2', marketplace: 'Shopee', kind: 'percent', value: 15, minSpend: 100000, quota: 300, used: 127, startDate: daysFromNow(-14), endDate: daysFromNow(2), status: 'active' },
+  { id: 'v5', code: 'OFFICIAL20K', title: 'Potongan Rp20.000 official store', accountId: 'mc5', marketplace: 'Shopee', kind: 'fixed', value: 20000, minSpend: 150000, quota: 120, used: 52, startDate: daysFromNow(-9), endDate: daysFromNow(6), status: 'paused' },
+  { id: 'v6', code: 'GADGET12', title: 'Diskon gadget 12%', accountId: 'mc4', marketplace: 'TikTok Shop', kind: 'percent', value: 12, minSpend: 150000, quota: 80, used: 0, startDate: daysFromNow(3), endDate: daysFromNow(20), status: 'scheduled' },
+  { id: 'v7', code: 'DAILY10K', title: 'Gratis ongkir daily needs', accountId: 'mc6', marketplace: 'Shopee', kind: 'shipping', value: 10000, minSpend: 100000, quota: 100, used: 12, startDate: daysFromNow(-30), endDate: daysFromNow(-2), status: 'ended' },
+  { id: 'v8', code: 'WORKSPACE8', title: 'Diskon workspace 8%', accountId: 'mc2', marketplace: 'Shopee', kind: 'percent', value: 8, minSpend: 300000, quota: 60, used: 19, startDate: daysFromNow(-2), endDate: daysFromNow(12), status: 'active' },
+]
+
+export const flashSales: FlashSale[] = [
+  { id: 'f1', title: 'Flash 20% Lofi Study Lamp', accountId: 'mc1', marketplace: 'TikTok Shop', productId: 'p1', discountPct: 20, quota: 60, sold: 41, startDate: daysFromNow(-2), endDate: daysFromNow(1), status: 'active' },
+  { id: 'f2', title: 'Flash 15% Smart Tumbler', accountId: 'mc3', marketplace: 'TikTok Shop', productId: 'p10', discountPct: 15, quota: 80, sold: 33, startDate: daysFromNow(-1), endDate: daysFromNow(2), status: 'active' },
+  { id: 'f3', title: 'Flash 25% Extended Desk Mat', accountId: 'mc2', marketplace: 'Shopee', productId: 'p8', discountPct: 25, quota: 50, sold: 28, startDate: daysFromNow(-1), endDate: daysFromNow(1), status: 'active' },
+  { id: 'f4', title: 'Flash 10% Mech Keyboard', accountId: 'mc5', marketplace: 'Shopee', productId: 'p7', discountPct: 10, quota: 30, sold: 30, startDate: daysFromNow(-8), endDate: daysFromNow(-3), status: 'ended' },
+  { id: 'f5', title: 'Flash 18% Silent Mouse', accountId: 'mc4', marketplace: 'TikTok Shop', productId: 'p3', discountPct: 18, quota: 40, sold: 0, startDate: daysFromNow(4), endDate: daysFromNow(5), status: 'scheduled' },
+  { id: 'f6', title: 'Flash 30% Braided Cable', accountId: 'mc2', marketplace: 'Shopee', productId: 'p6', discountPct: 30, quota: 100, sold: 67, startDate: daysFromNow(-3), endDate: daysFromNow(3), status: 'active' },
+]
+
+export const adCampaigns: AdCampaign[] = [
+  { id: 'a1', name: 'Studio Always-On', accountId: 'mc1', marketplace: 'TikTok Shop', objective: 'Sales', budget: 3500000, spend: 2850000, revenue: 9400000, impressions: 184000, clicks: 5200, conversions: 312, startDate: daysFromNow(-14), endDate: daysFromNow(7), status: 'active' },
+  { id: 'a2', name: 'Home Living Live', accountId: 'mc3', marketplace: 'TikTok Shop', objective: 'Live', budget: 2000000, spend: 1450000, revenue: 4100000, impressions: 96000, clicks: 3100, conversions: 148, startDate: daysFromNow(-10), endDate: daysFromNow(5), status: 'active' },
+  { id: 'a3', name: 'Workspace Search', accountId: 'mc2', marketplace: 'Shopee', objective: 'Traffic', budget: 2500000, spend: 2100000, revenue: 6800000, impressions: 142000, clicks: 4800, conversions: 236, startDate: daysFromNow(-12), endDate: daysFromNow(6), status: 'active' },
+  { id: 'a4', name: 'Official Store Boost', accountId: 'mc5', marketplace: 'Shopee', objective: 'Sales', budget: 3000000, spend: 2400000, revenue: 7200000, impressions: 128000, clicks: 3900, conversions: 204, startDate: daysFromNow(-9), endDate: daysFromNow(9), status: 'active' },
+  { id: 'a5', name: 'Gadget Retarget', accountId: 'mc4', marketplace: 'TikTok Shop', objective: 'Sales', budget: 1200000, spend: 0, revenue: 0, impressions: 0, clicks: 0, conversions: 0, startDate: daysFromNow(2), endDate: daysFromNow(16), status: 'paused' },
+  { id: 'a6', name: 'Daily Needs Launch', accountId: 'mc6', marketplace: 'Shopee', objective: 'Sales', budget: 1500000, spend: 900000, revenue: 1800000, impressions: 54000, clicks: 1600, conversions: 72, startDate: daysFromNow(-24), endDate: daysFromNow(-3), status: 'ended' },
 ]
 
 export const marketplaceConnections: MarketplaceConnection[] = [
@@ -609,12 +691,46 @@ export const marketplaceConnections: MarketplaceConnection[] = [
     permissions: ['Orders read', 'Products read/write', 'Inventory read', 'Analytics read'],
   },
   {
+    id: 'mc3',
+    name: 'TikTok Shop',
+    storeName: 'Nuanscape Home Living',
+    status: 'connected',
+    lastSync: daysFromNow(-1, 8),
+    permissions: ['Orders read', 'Products read/write', 'Inventory read', 'Analytics read'],
+  },
+  {
+    id: 'mc4',
+    name: 'TikTok Shop',
+    storeName: 'Nuanscape Gadget Lab',
+    status: 'disconnected',
+    lastSync: daysFromNow(-12, 9),
+    permissions: ['Orders read', 'Products read', 'Inventory read'],
+    note: 'Tautan diputus manual. Tautkan kembali untuk melanjutkan sinkronisasi.',
+  },
+  {
     id: 'mc2',
     name: 'Shopee',
     storeName: 'Nuanscape Workspace ID',
     status: 'connected',
     lastSync: daysFromNow(-1, 7),
     permissions: ['Orders read', 'Products read', 'Inventory read', 'Analytics read'],
+  },
+  {
+    id: 'mc5',
+    name: 'Shopee',
+    storeName: 'Nuanscape Official Store',
+    status: 'connected',
+    lastSync: daysFromNow(-1, 9),
+    permissions: ['Orders read', 'Products read', 'Inventory read', 'Analytics read'],
+  },
+  {
+    id: 'mc6',
+    name: 'Shopee',
+    storeName: 'Nuanscape Daily Needs',
+    status: 'disconnected',
+    lastSync: daysFromNow(-8, 10),
+    permissions: ['Orders read', 'Products read', 'Inventory read'],
+    note: 'Tautan diputus manual. Tautkan kembali untuk melanjutkan sinkronisasi.',
   },
 ]
 

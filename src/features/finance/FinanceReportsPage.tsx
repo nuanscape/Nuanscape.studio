@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress'
 import { Segmented } from '@/components/ui/segmented'
 import { BarTrendChart, DonutChart } from '@/components/charts/charts'
 import { useFinanceStore } from '@/stores/finance-store'
-import { useAppStore, useToastStore } from '@/stores/app-store'
+import { useToastStore } from '@/stores/app-store'
 import { categoryTotals, financeSummary } from '@/lib/metrics'
 import { financeInsights, financeSeries } from '@/data/mock'
 import { downloadText, formatIDR, formatPercent } from '@/lib/utils'
@@ -159,8 +159,8 @@ export function FinanceReportsPage() {
 
         <Card className="p-5">
           <SectionHeader title="Monthly breakdown" description="Klik ekspor untuk data lengkap" />
-          <div className="overflow-hidden rounded-lg border border-line">
-            <table className="w-full">
+          <div className="overflow-x-auto overscroll-x-contain rounded-lg border border-line">
+            <table className="w-full min-w-[460px]">
               <thead>
                 <tr className="border-b border-line bg-white/[0.03] text-[9px] uppercase tracking-[0.1em] text-text-muted">
                   <th className="px-3 py-2 text-left font-medium">Bulan</th>

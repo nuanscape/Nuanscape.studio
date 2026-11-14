@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog } from '@/components/ui/dialog'
 import { Input, Field, Select } from '@/components/ui/input'
+import { AccountScope } from '@/features/seller/components/account-scope'
 import { StockBar, StockBadge } from '@/features/seller/components/seller-ui'
 import { useSellerStore } from '@/stores/seller-store'
 import { useToastStore } from '@/stores/app-store'
@@ -20,20 +21,30 @@ const movementMeta: Record<InventoryMovement['type'], { label: string; tone: 'pr
 }
 
 export function SellerInventoryPage() {
-  const { products, movements, restockProduct } = useSellerStore()
+  const { products, movements, connections, activeAccountId, restockProduct } = useSellerStore()
   const { push } = useToastStore()
   const [query, setQuery] = React.useState('')
   const [selectedId, setSelectedId] = React.useState<string | null>(null)
   const [qty, setQty] = React.useState(20)
   const [reason, setReason] = React.useState('in')
 
-  const inventoryValue = products.reduce((a, p) => a + p.cost * p.stock, 0)
-  const units = products.reduce((a, p) => a + p.stock, 0)
-  const low = products.filter((p) => p.stock > 0 && p.stock <= p.minStock)
-  const out = products.filter((p) => p.stock === 0)
-  const selected = products.find((p) => p.id === selectedId)
+  const scopedProducts = activeAccountId === 'all'
+    ? products
+    : products.filter((p) => {
+        if (p.accountIds?.length) return p.accountIds.includes(activeAccountId)
+        const platform = connections.find((c) => c.id === activeAccountId)?.name
+        return Boolean(platform) && (p.marketplace === platform || p.marketplace === 'Both')
+      })
+  const scopedIds = new Set(scopedProducts.map((p) => p.id))
+  const scopedMovements = movements.filter((m) => scopedIds.has(m.productId))
 
-  const sorted = [...products]
+  const inventoryValue = scopedProducts.reduce((a, p) => a + p.cost * p.stock, 0)
+  const units = scopedProducts.reduce((a, p) => a + p.stock, 0)
+  const low = scopedProducts.filter((p) => p.stock > 0 && p.stock <= p.minStock)
+  const out = scopedProducts.filter((p) => p.stock === 0)
+  const selected = scopedProducts.find((p) => p.id === selectedId)
+
+  const sorted = [...scopedProducts]
     .filter((p) => !query.trim() || `${p.name} ${p.sku}`.toLowerCase().includes(query.toLowerCase()))
     .sort((a, b) => a.stock / Math.max(1, a.minStock) - b.stock / Math.max(1, b.minStock))
 
@@ -51,16 +62,19 @@ export function SellerInventoryPage() {
         title="Inventory"
         description="Pantau stok, nilai persediaan, dan riwayat pergerakan barang."
         actions={
-          <Button onClick={() => { setSelectedId(products[0]?.id ?? null); setQty(20) }}>
-            <PackagePlus /> Catat restock
-          </Button>
+          <>
+            <AccountScope />
+            <Button onClick={() => { setSelectedId(scopedProducts[0]?.id ?? null); setQty(20) }}>
+              <PackagePlus /> Catat restock
+            </Button>
+          </>
         }
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Nilai inventory" value={formatIDR(inventoryValue)} deltaLabel="berdasarkan HPP" icon={<Boxes />} accent="orange" />
-        <MetricCard label="Total unit" value={`${units} unit`} deltaLabel={`${products.length} SKU`} icon={<Boxes />} accent="yellow" />
-        <MetricCard label="Stok rendah" value={`${low.length} produk`} deltaLabel="≤ minimum" icon={<AlertTriangle />} tone="warning" accent="teal" />
+        <MetricCard label="Total unit" value={`${units} unit`} deltaLabel={`${scopedProducts.length} SKU`} icon={<Boxes />} accent="yellow" />
+        <MetricCard label="Stok rendah" value={`${low.length} produk`} deltaLabel="di bawah minimum" icon={<AlertTriangle />} tone="warning" accent="teal" />
         <MetricCard label="Stok habis" value={`${out.length} produk`} deltaLabel="perlu restock" icon={<AlertTriangle />} tone={out.length ? 'danger' : 'positive'} accent="pink" />
       </div>
 
@@ -98,10 +112,10 @@ export function SellerInventoryPage() {
 
         <Card>
           <div className="border-b border-line px-4 py-4">
-            <SectionHeader title="Pergerakan stok" description={`${movements.length} catatan`} className="mb-0" />
+            <SectionHeader title="Pergerakan stok" description={`${scopedMovements.length} catatan`} className="mb-0" />
           </div>
           <div className="max-h-[520px] divide-y divide-line overflow-y-auto">
-            {movements.map((m) => {
+            {scopedMovements.map((m) => {
               const meta = movementMeta[m.type]
               const product = products.find((p) => p.id === m.productId)
               return (
@@ -163,7 +177,7 @@ export function SellerInventoryPage() {
         <div className="space-y-4">
           <Field label="Produk">
             <Select value={selectedId ?? ''} onChange={(e) => setSelectedId(e.target.value)}>
-              {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {scopedProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </Select>
           </Field>
           <div className="grid grid-cols-2 gap-4">

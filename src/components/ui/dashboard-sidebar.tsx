@@ -100,11 +100,11 @@ export type WorkspaceOption = { id: string; name: string; subtitle?: string };
 
 function WorkspaceSwitcher({ selected, onSelect, options, subtitle }: { selected?: string, onSelect?: (ws: string) => void, options?: WorkspaceOption[], subtitle?: string }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [internalSelected, setInternalSelected] = useState('Acme Corp');
+  const [internalSelected, setInternalSelected] = useState('Monitor');
   const list = options && options.length ? options : [
-    { id: 'Acme Corp', name: 'Acme Corp', subtitle: 'Pro Plan' },
-    { id: 'Personal Workspace', name: 'Personal Workspace', subtitle: 'Personal' },
-    { id: 'Client Sandbox', name: 'Client Sandbox', subtitle: 'Sandbox' },
+    { id: 'Monitor', name: 'Monitor', subtitle: 'AI Workspace' },
+    { id: 'Seller', name: 'Seller', subtitle: 'AI Workspace' },
+    { id: 'Content', name: 'Content', subtitle: 'AI Workspace' },
   ];
   
   const current = selected || internalSelected;
@@ -123,7 +123,7 @@ function WorkspaceSwitcher({ selected, onSelect, options, subtitle }: { selected
           </div>
           <div className="flex flex-col overflow-hidden">
             <span className="text-[13px] font-medium leading-none mb-1 text-foreground truncate max-w-[120px]">{currentOption.name}</span>
-            <span className="text-[11px] text-muted-foreground leading-none">{subtitle || currentOption.subtitle || 'Pro Plan'}</span>
+            <span className="text-[11px] text-muted-foreground leading-none">{subtitle || currentOption.subtitle || 'AI Workspace'}</span>
           </div>
         </div>
         <ChevronDown className="w-4 h-4 text-muted-foreground/50 group-hover:text-foreground/70 transition-colors shrink-0" strokeWidth={1.5} />
@@ -307,6 +307,18 @@ export function SidebarNav({
           ))}
         </div>
       )}
+
+      <div className={`border-t border-white/[0.06] pt-3 ${footerItems.length === 0 ? 'mt-auto' : ''}`}>
+        <a href="/app/overview" aria-label="NuanScape" className="flex items-center px-2 py-2 opacity-90 transition-opacity hover:opacity-100">
+          <img
+            src="/nuanscape-iso-matrix.png"
+            alt="NuanScape"
+            width={686}
+            height={200}
+            className="h-7 w-auto object-contain"
+          />
+        </a>
+      </div>
     </div>
   );
 }
@@ -324,7 +336,7 @@ const flatMockData = flattenItems(allItems);
 export default function SidebarNavPreview() {
   const [isOpen, setIsOpen] = useState(true);
   const [activeId, setActiveId] = useState('home');
-  const [activeWorkspace, setActiveWorkspace] = useState('Acme Corp');
+  const [activeWorkspace, setActiveWorkspace] = useState('Monitor');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const activeItem = flatMockData.find(i => i.id === activeId);

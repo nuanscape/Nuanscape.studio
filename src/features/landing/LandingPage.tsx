@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowRight, Bot, Clapperboard, Radar, Store, Wallet } from 'lucide-react'
+import { ArrowRight, Clapperboard, Radar, Store, Wallet } from 'lucide-react'
 import { PrismaHero } from '@/components/ui/prisma-hero'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -65,7 +65,7 @@ export function LandingPage() {
             </Link>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             {interfaces.map((item, index) => (
               <motion.div
                 key={item.id}
@@ -97,33 +97,6 @@ export function LandingPage() {
             ))}
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/10 bg-white/[0.03] px-4 py-3 sm:px-5">
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              {[
-                { icon: Radar, label: 'Agent Monitor', tone: 'mint' as IosTone },
-                { icon: Store, label: 'Seller Agent', tone: 'amber' as IosTone },
-                { icon: Clapperboard, label: 'Content Agent', tone: 'sky' as IosTone },
-                { icon: Wallet, label: 'Finance Agent', tone: 'green' as IosTone },
-                { icon: Bot, label: 'Nuanscape AI', tone: 'violet' as IosTone },
-              ].map((item) => (
-                <div key={item.label} className="group inline-flex items-center gap-2.5 rounded-2xl border border-white/10 bg-black/15 px-2.5 py-2 pr-3 text-[#E1E0CC]/80 transition-colors hover:border-white/20 hover:text-[#F4F3EA]" title={item.label}>
-                  <IosIcon icon={item.icon} tone={item.tone} size="sm" />
-                  <span className="text-[12px] font-medium">{item.label}</span>
-                </div>
-              ))}
-            </div>
-            <div className="flex items-center">
-              <img
-                src="/logo-n-opt.png"
-                alt="Nuanscape"
-                width={360}
-                height={133}
-                loading="lazy"
-                decoding="async"
-                className="h-5 w-auto object-contain"
-              />
-            </div>
-          </div>
         </div>
       </section>
     </div>

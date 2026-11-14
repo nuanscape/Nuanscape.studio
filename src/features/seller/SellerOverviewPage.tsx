@@ -15,20 +15,72 @@ import { Card } from '@/components/ui/card'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DonutChart, BarTrendChart } from '@/components/charts/charts'
+import { AccountScope } from '@/features/seller/components/account-scope'
 import { useSellerStore } from '@/stores/seller-store'
-import { useAppStore, useToastStore } from '@/stores/app-store'
-import { shopMetrics, profitWaterfall } from '@/lib/metrics'
-import { marketplaces, shopInsights, shopSeries } from '@/data/mock'
+import { useToastStore } from '@/stores/app-store'
+import {
+  buildSellerLedger,
+  ledgerPlatformSeries,
+  scopeLedger,
+  summarizeLedger,
+} from '@/lib/seller-ledger'
+import { shopInsights } from '@/data/mock'
 import { cn, formatDate, formatIDR, formatPercent } from '@/lib/utils'
-import { MarketplaceBadge, OrderStatusBadge, StockBar } from '@/features/seller/components/seller-ui'
+import { AccountBadge, MarketplaceBadge, OrderStatusBadge, StockBar } from '@/features/seller/components/seller-ui'
 
 export function SellerOverviewPage() {
-  const { products, orders, fees, restockProduct } = useSellerStore()
-    const { push } = useToastStore()
-  const metrics = shopMetrics(products, fees)
-  const waterfall = profitWaterfall(products, fees)
-  const maxAbs = Math.max(...waterfall.map((w) => Math.abs(w.value)))
-  const recent = [...orders].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 6)
+  const {
+    products,
+    orders,
+    connections,
+    vouchers,
+    flashSales,
+    ads,
+    fees,
+    restockProduct,
+    activeAccountId,
+    setActiveAccount,
+  } = useSellerStore()
+  const { push } = useToastStore()
+
+  const entries = React.useMemo(
+    () => scopeLedger(
+      buildSellerLedger({ orders, products, connections, vouchers, flashSales, ads, fees }),
+      activeAccountId,
+    ),
+    [orders, products, connections, vouchers, flashSales, ads, fees, activeAccountId],
+  )
+  const metrics = React.useMemo(() => summarizeLedger(entries), [entries])
+  const series = React.useMemo(() => ledgerPlatformSeries(entries), [entries])
+  const scopedProducts = activeAccountId === 'all'
+    ? products
+    : products.filter((p) => p.accountIds?.includes(activeAccountId))
+  const scopedOrders = activeAccountId === 'all'
+    ? orders
+    : orders.filter((o) => o.accountId === activeAccountId)
+  const inventoryValue = scopedProducts.reduce((a, p) => a + p.cost * p.stock, 0)
+  const inventoryUnits = scopedProducts.reduce((a, p) => a + p.stock, 0)
+  const lowStock = scopedProducts.filter((p) => p.stock > 0 && p.stock <= p.minStock)
+  const outOfStock = scopedProducts.filter((p) => p.stock === 0)
+  const incomeEntries = entries.filter((e) => e.type === 'income')
+  const tiktokIncome = incomeEntries.filter((e) => e.marketplace === 'TikTok Shop').reduce((a, e) => a + e.amount, 0)
+  const shopeeIncome = incomeEntries.filter((e) => e.marketplace === 'Shopee').reduce((a, e) => a + e.amount, 0)
+  const platformMix = [
+    { name: 'TikTok Shop', value: tiktokIncome, color: '#F5D64B' },
+    { name: 'Shopee', value: shopeeIncome, color: '#FFD166' },
+  ].filter((x) => x.value > 0)
+  const waterfall = [
+    { name: 'Pemasukan', value: metrics.income, type: 'total' as const },
+    { name: 'Diskon promo', value: -metrics.discounts, type: 'negative' as const },
+    { name: 'Refund', value: -metrics.refunds, type: 'negative' as const },
+    { name: 'HPP', value: -metrics.cogs, type: 'negative' as const },
+    { name: 'Fee & ongkir', value: -(metrics.platformFees + metrics.affiliateFees + metrics.shipping), type: 'negative' as const },
+    { name: 'Iklan + opex', value: -(metrics.ads + metrics.opex), type: 'negative' as const },
+    { name: 'Saldo bersih', value: metrics.net, type: 'total' as const },
+  ]
+  const maxAbs = Math.max(1, ...waterfall.map((w) => Math.abs(w.value)))
+  const recent = [...scopedOrders].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 6)
+  const connectedAccounts = connections.filter((c) => c.status === 'connected')
 
   const restock = (id: string, name: string, qty: number) => {
     restockProduct(id, qty)
@@ -39,24 +91,25 @@ export function SellerOverviewPage() {
     <div>
       <PageHeader
         title="Seller overview"
-        description="Pantau revenue, profit, stok, dan pesanan lintas marketplace dalam satu dashboard."
+        description="Pantau pemasukan, saldo bersih, stok, dan pesanan per akun marketplace."
         actions={
           <>
+            <AccountScope />
             <Link to="/app/seller/marketplaces" className={buttonVariants({ variant: 'secondary' })}>
               <ShoppingBag /> Marketplaces
             </Link>
             <Link to="/app/seller/finance" className={buttonVariants()}>
-              <Wallet /> Profit breakdown
+              <Wallet /> Buku kas
             </Link>
           </>
         }
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Gross revenue 30D" value={formatIDR(metrics.grossRevenue)} delta={14.8} deltaLabel="vs 30 hari lalu" icon={<TrendingUp />} accent="orange" />
-        <MetricCard label="Net profit" value={formatIDR(Math.round(metrics.netProfit))} delta={6.4} deltaLabel={`${formatPercent(metrics.margin)} margin`} icon={<Wallet />} tone="positive" accent="yellow" />
-        <MetricCard label="Pesanan" value={`${metrics.orders} order`} delta={9.2} deltaLabel={`AOV ${formatIDR(metrics.aov, { compact: true })}`} icon={<Package />} accent="teal" />
-        <MetricCard label="Inventory value" value={formatIDR(metrics.inventoryValue)} deltaLabel={`${metrics.inventoryUnits} unit`} icon={<Boxes />} tone={metrics.lowStock.length ? 'warning' : 'default'} accent="pink" />
+        <MetricCard label="Total pemasukan" value={formatIDR(metrics.income)} deltaLabel={`${metrics.orders} pesanan settled`} icon={<TrendingUp />} accent="orange" />
+        <MetricCard label="Saldo bersih" value={formatIDR(Math.round(metrics.net))} deltaLabel={`margin ${formatPercent(metrics.margin)}`} icon={<Wallet />} tone={metrics.net >= 0 ? 'positive' : 'danger'} accent="yellow" />
+        <MetricCard label="Pesanan" value={`${scopedOrders.length} order`} deltaLabel={`AOV ${formatIDR(metrics.aov, { compact: true })}`} icon={<Package />} accent="teal" />
+        <MetricCard label="Inventory value" value={formatIDR(inventoryValue)} deltaLabel={`${inventoryUnits} unit`} icon={<Boxes />} tone={lowStock.length ? 'warning' : 'default'} accent="pink" />
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.6fr_1fr]">
@@ -64,10 +117,10 @@ export function SellerOverviewPage() {
           <SectionHeader
             title="Revenue by marketplace"
             description="7 hari terakhir"
-            action={<Badge tone="primary"><TrendingUp /> 14,8%</Badge>}
+            action={<Badge tone="primary">{activeAccountId === 'all' ? 'Semua akun' : 'Akun terpilih'}</Badge>}
           />
           <BarTrendChart
-            data={shopSeries}
+            data={series}
             xKey="label"
             stacked
             series={[
@@ -78,29 +131,73 @@ export function SellerOverviewPage() {
           />
         </Card>
         <Card className="p-5">
-          <SectionHeader title="Marketplace mix" description="Porsi revenue 30 hari" />
+          <SectionHeader title="Marketplace mix" description="Porsi pemasukan tercatat" />
           <DonutChart
-            data={marketplaces.map((m) => ({ name: m.name, value: m.share, color: m.color }))}
+            data={platformMix.length ? platformMix : [{ name: 'Belum ada', value: 1, color: '#2a2a2a' }]}
             height={170}
-            centerValue={formatIDR(metrics.netSales, { compact: true })}
-            centerLabel="net sales"
+            centerValue={formatIDR(metrics.income, { compact: true })}
+            centerLabel="pemasukan"
           />
           <div className="mt-3 space-y-2">
-            {marketplaces.map((m) => (
+            {platformMix.map((m) => (
               <div key={m.name} className="flex items-center gap-2 text-[11px]">
                 <span className="size-2 rounded-full" style={{ backgroundColor: m.color }} />
                 <span className="flex-1 text-text-secondary">{m.name}</span>
-                <span className="text-text-muted">{m.orders} order</span>
-                <span className="num text-text-primary">{formatIDR(m.revenue, { compact: true })}</span>
+                <span className="text-text-muted">{incomeEntries.filter((e) => e.marketplace === m.name).length} order</span>
+                <span className="num text-text-primary">{formatIDR(m.value, { compact: true })}</span>
               </div>
             ))}
+            {platformMix.length === 0 ? <p className="text-[10px] text-text-muted">Belum ada pemasukan settled pada cakupan ini.</p> : null}
           </div>
         </Card>
       </div>
 
+      <Card className="mt-4 p-5">
+        <SectionHeader
+          title="Akun marketplace"
+          description={`${connectedAccounts.length} dari ${connections.length} akun tertaut · maksimal 3 akun per platform`}
+          action={<Link to="/app/seller/marketplaces" className="text-[10px] text-primary">Kelola akun</Link>}
+        />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {(['TikTok Shop', 'Shopee'] as const).map((platform) => {
+            const accounts = connections.filter((c) => c.name === platform)
+            const linked = accounts.filter((c) => c.status === 'connected').length
+            return (
+              <div key={platform} className="rounded-xl border border-line bg-white/[0.02] p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <MarketplaceBadge marketplace={platform} />
+                  <span className="text-[10px] text-text-muted">{linked}/{accounts.length} tertaut</span>
+                </div>
+                <div className="mt-2.5 space-y-1.5">
+                  {accounts.map((account) => (
+                    <button
+                      key={account.id}
+                      type="button"
+                      onClick={() => setActiveAccount(activeAccountId === account.id ? 'all' : account.id)}
+                      className={cn(
+                        'flex w-full items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-colors',
+                        activeAccountId === account.id
+                          ? 'border-primary/35 bg-primary/[0.08]'
+                          : 'border-line/60 bg-white/[0.02] hover:border-line-strong',
+                      )}
+                    >
+                      <span className={cn('size-1.5 shrink-0 rounded-full', account.status === 'connected' ? 'bg-teal' : 'bg-white/20')} />
+                      <span className="min-w-0 flex-1 truncate text-[10px] text-text-secondary">{account.storeName}</span>
+                      <span className="shrink-0 text-[9px] text-text-muted">
+                        {activeAccountId === account.id ? 'Dipilih' : account.status === 'connected' ? 'Tertaut' : 'Terputus'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </Card>
+
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.3fr]">
         <Card className="p-5">
-          <SectionHeader title="Profit waterfall" description="Dari gross revenue ke net profit" action={<Link to="/app/seller/finance" className="text-[10px] text-primary">Detail</Link>} />
+          <SectionHeader title="Saldo waterfall" description="Dari pemasukan ke saldo bersih" action={<Link to="/app/seller/finance" className="text-[10px] text-primary">Detail</Link>} />
           <div className="space-y-1.5">
             {waterfall.map((w) => (
               <div key={w.name} className="flex items-center gap-2">
@@ -122,7 +219,7 @@ export function SellerOverviewPage() {
           </div>
           <p className="mt-3 text-[10px] leading-relaxed text-text-muted">
             Fee memakai konfigurasi {fees.marketplacePct}% marketplace + {fees.affiliatePct}% afiliasi.
-            Ubah di halaman Finance untuk melihat dampak.
+            Diskon, iklan, dan opex ikut dipotong. Ubah di halaman Finance untuk melihat dampak.
           </p>
         </Card>
 
@@ -139,7 +236,12 @@ export function SellerOverviewPage() {
                     <p className="truncate text-[11px] font-medium text-text-primary">{o.product}</p>
                     <MarketplaceBadge marketplace={o.marketplace} />
                   </div>
-                  <p className="text-[9px] text-text-muted">{o.customer} · {formatDate(o.date, 'd MMM HH:mm')}</p>
+                  <div className="flex items-center gap-1.5 text-[9px] text-text-muted">
+                    <span>{o.customer}</span>
+                    <span>·</span>
+                    <span>{formatDate(o.date, 'd MMM HH:mm')}</span>
+                    <AccountBadge accountId={o.accountId} />
+                  </div>
                 </div>
                 <OrderStatusBadge status={o.status} />
                 <p className="num w-20 text-right text-[11px] text-text-primary">{formatIDR(o.total, { compact: true })}</p>
@@ -153,11 +255,11 @@ export function SellerOverviewPage() {
         <Card className="p-5">
           <SectionHeader
             title="Stok kritis"
-            description={`${metrics.lowStock.length + metrics.outOfStock.length} produk perlu perhatian`}
+            description={`${lowStock.length + outOfStock.length} produk perlu perhatian`}
             action={<Link to="/app/seller/inventory" className="text-[10px] text-primary">Inventory</Link>}
           />
           <div className="space-y-2.5">
-            {[...metrics.outOfStock, ...metrics.lowStock].slice(0, 5).map((p) => (
+            {[...outOfStock, ...lowStock].slice(0, 5).map((p) => (
               <div key={p.id} className="rounded-lg border border-line bg-white/[0.02] p-2.5">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
@@ -174,7 +276,7 @@ export function SellerOverviewPage() {
                 </div>
               </div>
             ))}
-            {metrics.lowStock.length + metrics.outOfStock.length === 0 ? (
+            {lowStock.length + outOfStock.length === 0 ? (
               <p className="text-[11px] text-text-muted">Semua stok aman.</p>
             ) : null}
           </div>

@@ -6,23 +6,32 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { RadialScore } from '@/components/charts/charts'
+import { AccountScope } from '@/features/seller/components/account-scope'
 import { MarketplaceBadge } from '@/features/seller/components/seller-ui'
 import { useSellerStore } from '@/stores/seller-store'
 import { useToastStore } from '@/stores/app-store'
 import { cn, formatPercent } from '@/lib/utils'
 
 export function SellerSeoPage() {
-  const { products, updateProduct } = useSellerStore()
+  const { products, connections, activeAccountId, updateProduct } = useSellerStore()
   const { push } = useToastStore()
   const [selectedId, setSelectedId] = React.useState(products[0]?.id ?? '')
   const [query, setQuery] = React.useState('')
 
-  const selected = products.find((p) => p.id === selectedId) ?? products[0]
-  const avgSeo = products.length ? products.reduce((a, p) => a + p.seoScore, 0) / products.length : 0
-  const avgGeo = products.length ? products.reduce((a, p) => a + p.geoScore, 0) / products.length : 0
-  const below = products.filter((p) => p.seoScore < 70).length
+  const scopedProducts = activeAccountId === 'all'
+    ? products
+    : products.filter((p) => {
+        if (p.accountIds?.length) return p.accountIds.includes(activeAccountId)
+        const platform = connections.find((c) => c.id === activeAccountId)?.name
+        return Boolean(platform) && (p.marketplace === platform || p.marketplace === 'Both')
+      })
 
-  const list = products
+  const selected = scopedProducts.find((p) => p.id === selectedId) ?? scopedProducts[0]
+  const avgSeo = scopedProducts.length ? scopedProducts.reduce((a, p) => a + p.seoScore, 0) / scopedProducts.length : 0
+  const avgGeo = scopedProducts.length ? scopedProducts.reduce((a, p) => a + p.geoScore, 0) / scopedProducts.length : 0
+  const below = scopedProducts.filter((p) => p.seoScore < 70).length
+
+  const list = scopedProducts
     .filter((p) => !query.trim() || `${p.name} ${p.sku}`.toLowerCase().includes(query.toLowerCase()))
     .sort((a, b) => a.seoScore - b.seoScore)
 
@@ -57,12 +66,15 @@ export function SellerSeoPage() {
         title="SEO & GEO"
         description="Periksa kualitas judul, deskripsi, dan atribut produk untuk pencarian marketplace dan AI."
         actions={
-          <Button
-            variant="secondary"
-            onClick={() => push({ title: 'Audit dijalankan', description: 'Skor dihitung ulang dari data produk saat ini.', tone: 'info' })}
-          >
-            <Sparkles /> Jalankan audit
-          </Button>
+          <>
+            <AccountScope />
+            <Button
+              variant="secondary"
+              onClick={() => push({ title: 'Audit dijalankan', description: 'Skor dihitung ulang dari data produk saat ini.', tone: 'info' })}
+            >
+              <Sparkles /> Jalankan audit
+            </Button>
+          </>
         }
       />
 
@@ -70,7 +82,7 @@ export function SellerSeoPage() {
         <MetricCard label="Rata-rata SEO" value={Math.round(avgSeo)} deltaLabel="dari 100" icon={<Search />} accent="orange" />
         <MetricCard label="Rata-rata GEO" value={Math.round(avgGeo)} deltaLabel="kesiapan untuk AI search" icon={<Globe2 />} accent="yellow" />
         <MetricCard label="Perlu perbaikan" value={`${below} produk`} deltaLabel="SEO di bawah 70" icon={<Lightbulb />} tone={below ? 'warning' : 'positive'} accent="teal" />
-        <MetricCard label="Produk dianalisis" value={`${products.length} SKU`} deltaLabel="di semua marketplace" icon={<Search />} accent="pink" />
+        <MetricCard label="Produk dianalisis" value={`${scopedProducts.length} SKU`} deltaLabel="di semua akun marketplace" icon={<Search />} accent="pink" />
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.1fr_1fr]">

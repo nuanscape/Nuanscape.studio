@@ -141,10 +141,10 @@ const PrismaHero = () => {
           className="absolute left-4 top-4 z-30 sm:left-6 sm:top-5 md:left-8 md:top-6"
         >
           <img
-            src="/logo-n-opt.png"
+            src="/nuanscape-iso-matrix.png"
             alt="Nuanscape"
-            width={360}
-            height={133}
+            width={686}
+            height={200}
             fetchPriority="high"
             decoding="async"
             className="block h-9 w-auto object-contain sm:h-10 md:h-12"
@@ -164,7 +164,7 @@ const PrismaHero = () => {
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/60" />
 
         {/* Navbar */}
-        <nav className="absolute left-1/2 top-0 z-20 -translate-x-1/2">
+        <nav className="absolute left-1/2 top-0 z-20 hidden -translate-x-1/2 sm:block">
           <div className="flex items-center gap-1 rounded-b-2xl border-x border-b border-white/[0.06] bg-black/95 px-2.5 py-1.5 shadow-[0_10px_30px_-18px_rgba(0,0,0,0.9)] backdrop-blur-sm sm:gap-1.5 sm:px-3 sm:py-2 md:rounded-b-[22px] md:px-4">
             {navItems.map((item) => (
               <a
@@ -188,7 +188,7 @@ const PrismaHero = () => {
             
             <div className="col-span-12 lg:col-span-8">
               <h1
-                className="flex flex-col items-start font-medium tracking-[-0.07em] text-[18vw] sm:text-[16vw] md:text-[14vw] lg:text-[12vw] xl:text-[11vw] 2xl:text-[11vw]"
+                className="flex max-w-full flex-col items-start font-medium tracking-[-0.07em] text-[14vw] sm:text-[13vw] md:text-[13vw] lg:text-[12vw] xl:text-[11vw] 2xl:text-[11vw]"
                 style={{ color: "#E1E0CC" }}
               >
                 <span className="block leading-[0.84]">

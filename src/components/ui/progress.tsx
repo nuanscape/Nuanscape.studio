@@ -1,4 +1,3 @@
-import * as React from 'react'
 import { cn, clamp } from '@/lib/utils'
 
 export function Progress({

@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom'
 import {
   Bell,
   Bot,
-  CreditCard,
   Database,
   Download,
   Globe2,
@@ -32,7 +31,6 @@ const tabs = [
   { value: 'workspace', label: 'Workspace', icon: <Globe2 /> },
   { value: 'notifications', label: 'Notifikasi', icon: <Bell /> },
   { value: 'ai', label: 'AI', icon: <Bot /> },
-  { value: 'billing', label: 'Billing', icon: <CreditCard /> },
   { value: 'data', label: 'Data', icon: <Database /> },
 ]
 
@@ -96,7 +94,7 @@ export function SettingsPage() {
       <Tabs value={tab} onValueChange={setTab} className="space-y-4">
         <TabsList className="no-scrollbar w-full justify-start overflow-x-auto">
           {tabs.map((t) => (
-            <TabsTrigger key={t.value} value={t.value} className="[&_svg]:size-3.5">
+            <TabsTrigger key={t.value} value={t.value} className="gap-1 px-1.5 [&_svg]:size-3.5 sm:gap-1.5 sm:px-3.5">
               {t.icon}{t.label}
             </TabsTrigger>
           ))}
@@ -129,20 +127,19 @@ export function SettingsPage() {
               </div>
             </Card>
             <Card className="p-5">
-              <SectionHeader title="Akun demo" description="Status sesi saat ini" />
+              <SectionHeader title="Akun & workspace" description="Status sesi lokal saat ini" />
               <div className="space-y-2.5">
-                <Row label="Plan" value={<Badge tone="primary">Pro</Badge>} />
-                <Row label="Workspace" value="Personal" />
-                <Row label="Data" value="localStorage" />
-                <Row label="Mode" value="Demo — tanpa autentikasi" />
+                <Row label="Status" value={<Badge tone="primary">Aktif</Badge>} />
+                <Row label="Workspace" value="Nuanscape Studio" />
+                <Row label="Penyimpanan" value="Lokal di browser" />
+                <Row label="Mode" value="Akun studio lokal" />
               </div>
               <div className="mt-4 rounded-lg border border-line bg-white/[0.02] p-3">
                 <p className="text-[10px] leading-relaxed text-text-muted">
-                  Aplikasi ini demo frontend. Tidak ada server autentikasi dan tidak ada data yang
-                  dikirim keluar browser.
+                  Profil, preferensi, dan data workspace disimpan lokal di browser perangkat ini.
                 </p>
               </div>
-              <Link to="/app/profile" className="mt-3 inline-flex text-[11px] text-primary">Lihat profile lengkap →</Link>
+              <Link to="/app/profile" className="mt-3 inline-flex text-[11px] text-primary">Lihat profil lengkap →</Link>
             </Card>
           </div>
         </TabsContent>
@@ -254,36 +251,7 @@ export function SettingsPage() {
           </div>
         </TabsContent>
 
-        <TabsContent value="billing">
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.3fr_1fr]">
-            <Card className="p-5">
-              <SectionHeader title="Plan saat ini" description="Pro · demo" action={<Badge tone="primary">Aktif</Badge>} />
-              <div className="rounded-xl border border-primary/20 bg-primary/[0.04] p-4">
-                <p className="text-[20px] font-semibold text-text-primary">Pro</p>
-                <p className="mt-0.5 text-[11px] text-text-muted">Semua workspace, analisis lintas data, ekspor lokal.</p>
-                <p className="num mt-3 text-[22px] font-semibold text-primary">Rp149.000<span className="text-[11px] font-normal text-text-muted"> / bulan</span></p>
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <Row label="Metode" value="Demo — tidak ada tagihan" />
-                <Row label="Periode" value="Aktif selamanya (demo)" />
-              </div>
-              <Button variant="secondary" className="mt-4 w-full" onClick={() => push({ title: 'Demo billing', description: 'Tidak ada pembayaran pada demo ini.', tone: 'info' })}>
-                Kelola billing
-              </Button>
-            </Card>
-            <Card className="p-5">
-              <SectionHeader title="Yang termasuk" description="Di semua plan demo" />
-              <ul className="space-y-2 text-[11px] text-text-secondary">
-                {['Finance & budget tracking', 'Content studio dan kalender', 'Seller intelligence & SEO', 'AI assistant dengan konteks', 'Ekspor CSV dan JSON', 'Data lokal tanpa server'].map((f) => (
-                  <li key={f} className="flex gap-2"><span className="text-primary">·</span>{f}</li>
-                ))}
-              </ul>
-              <p className="mt-3 text-[10px] leading-relaxed text-text-muted">
-                Harga dan fitur adalah ilustrasi produk, bukan penawaran komersial.
-              </p>
-            </Card>
-          </div>
-        </TabsContent>
+
 
         <TabsContent value="data">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

@@ -1,4 +1,3 @@
-import * as React from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   ChevronsUpDown,
@@ -208,6 +207,25 @@ export function Sidebar() {
             ) : null}
           </Link>
         </div>
+      </div>
+
+      <div className={cn('border-t border-line', sidebarCollapsed ? 'px-3 py-3' : 'px-5 py-4')}>
+        <Link
+          to="/app/overview"
+          aria-label="NuanScape"
+          className={cn('inline-flex flex-col opacity-90 transition-opacity hover:opacity-100', sidebarCollapsed && 'items-center')}
+        >
+          <img
+            src="/nuanscape-iso-matrix.png"
+            alt="NuanScape"
+            width={686}
+            height={200}
+            className={cn('w-auto object-contain', sidebarCollapsed ? 'h-7' : 'h-8')}
+          />
+          {!sidebarCollapsed ? (
+            <span className="mt-1 text-[9px] uppercase tracking-[0.18em] text-text-muted">AI Command Center</span>
+          ) : null}
+        </Link>
       </div>
 
       <button

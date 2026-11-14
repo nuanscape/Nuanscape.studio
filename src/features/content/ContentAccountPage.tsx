@@ -67,7 +67,7 @@ export function ContentAccountPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Link to={`${basePath}${scope}`} className={buttonVariants({ variant: 'secondary' })}>
+            <Link to={`/app/content/flow?account=${account.id}`} className={buttonVariants({ variant: 'secondary' })}>
               <ArrowRight /> Buka flow
             </Link>
             <Link to={`${basePath}/studio${scope}`} className={buttonVariants()}>

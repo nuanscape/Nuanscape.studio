@@ -7,7 +7,6 @@ import { CommandPalette } from '@/components/layout/command-palette'
 import { useAppStore } from '@/stores/app-store'
 import { getWorkspaceForPath, workspaces } from '@/components/navigation/nav-config'
 import { cn } from '@/lib/utils'
-import { Search } from 'lucide-react'
 
 export function MainLayout() {
   const { sidebarCollapsed, setCommandOpen } = useAppStore()
@@ -29,15 +28,12 @@ export function MainLayout() {
   const groups = React.useMemo<NavGroupData[]>(
     () => [
       {
-        items: [
-          { id: 'search', title: 'Search', icon: Search, shortcut: '⌘K', href: '__search__' },
-          ...workspace.items.map((item) => ({
-            id: item.href,
-            title: item.label,
-            icon: item.icon,
-            href: item.href,
-          })),
-        ],
+        items: workspace.items.map((item) => ({
+          id: item.href,
+          title: item.label,
+          icon: item.icon,
+          href: item.href,
+        })),
       },
     ],
     [workspace],
@@ -49,10 +45,9 @@ export function MainLayout() {
     )?.href ?? workspace.href
 
   const onSelect = (id: string) => {
-    if (id === 'search' || id === '__search__') return setCommandOpen(true)
     const item = groups[0].items.find((i) => i.id === id)
     const href = item?.href
-    if (href && href !== '__search__') navigate(href)
+    if (href) navigate(href)
     else if (id.startsWith('/')) navigate(id)
   }
 
@@ -76,7 +71,6 @@ export function MainLayout() {
             if (w) navigate(w.href)
           }}
           workspaceOptions={workspaces.map((w) => ({ id: w.id, name: w.label, subtitle: w.short }))}
-          workspaceSubtitle="Nuanscape.studio"
           className="h-full border-r border-white/[0.06] bg-[#0a0a0a]"
         />
       </div>

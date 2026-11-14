@@ -28,7 +28,7 @@ export function TabsList({ className, ...props }: React.HTMLAttributes<HTMLDivEl
     <div
       role="tablist"
       className={cn(
-        'inline-flex items-center gap-1 rounded-full border border-white/[0.08] bg-[#0f0f0f] p-1',
+        'no-scrollbar inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-full border border-white/[0.08] bg-[#0f0f0f] p-1',
         className,
       )}
       {...props}

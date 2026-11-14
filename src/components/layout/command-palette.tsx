@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { CornerDownLeft, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/stores/app-store'
-import { searchableRoutes } from '@/components/navigation/nav-config'
+import { searchableRoutes, searchableWorkspaces } from '@/components/navigation/nav-config'
 import { Dialog } from '@/components/ui/dialog'
 
 export function CommandPalette() {
@@ -14,8 +14,11 @@ export function CommandPalette() {
 
   const results = React.useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return searchableRoutes.slice(0, 12)
-    return searchableRoutes.filter((r) => r.keywords.includes(q) || r.label.toLowerCase().includes(q)).slice(0, 14)
+    const allRoutes = [...searchableWorkspaces, ...searchableRoutes]
+    if (!q) return allRoutes
+    return allRoutes
+      .filter((r) => r.keywords.includes(q) || r.label.toLowerCase().includes(q))
+      .slice(0, 20)
   }, [query])
 
   React.useEffect(() => {

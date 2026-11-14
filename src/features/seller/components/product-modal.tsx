@@ -18,6 +18,7 @@ const schema = z.object({
   stock: z.coerce.number().min(0, 'Stok tidak boleh negatif'),
   minStock: z.coerce.number().min(0),
   marketplace: z.enum(['TikTok Shop', 'Shopee', 'Both']),
+  discountPct: z.coerce.number().min(0).max(90),
   status: z.enum(['Active', 'Paused', 'Out of Stock']),
   seoScore: z.coerce.number().min(0).max(100),
   geoScore: z.coerce.number().min(0).max(100),
@@ -49,6 +50,7 @@ export function ProductModal({
       stock: 0,
       minStock: 10,
       marketplace: 'Both',
+      discountPct: 0,
       status: 'Active',
       seoScore: 75,
       geoScore: 70,
@@ -66,6 +68,7 @@ export function ProductModal({
         stock: product?.stock ?? 0,
         minStock: product?.minStock ?? 10,
         marketplace: product?.marketplace ?? 'Both',
+        discountPct: product?.discountPct ?? 0,
         status: product?.status ?? 'Active',
         seoScore: product?.seoScore ?? 75,
         geoScore: product?.geoScore ?? 70,
@@ -119,6 +122,9 @@ export function ProductModal({
               <option value="Shopee">Shopee</option>
               <option value="Both">Both</option>
             </Select>
+          </Field>
+          <Field label="Diskon produk (%)">
+            <Input type="number" min="0" max="90" {...register('discountPct')} />
           </Field>
           <Field label="Harga jual (Rp)" error={errors.price?.message}>
             <Input type="number" min="0" placeholder="0" {...register('price')} />
