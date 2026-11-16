@@ -320,6 +320,7 @@ Baseline 30 hari (revenue, COGS, diskon, refund, jumlah order, split marketplace
 Default `AGENT_RUNTIME=picoclaw`; setiap briefing memakai LLM nyata. PicoClaw adalah sidecar analisis **read-only**: ia hanya membaca `context.json` dan menghasilkan temuan, sedangkan backend tetap memegang auth, approval, audit, dan semua aksi tulis.
 
 - Identitas agent: Muhe (head/orchestrator), Asep (Finance), Ucup (Seller), Bambang (Content) di `agents/picoclaw/workspace*/AGENT.md`, dengan persona di `SOUL.md`, profil pengguna di `USER.md`, dan prosedur domain di `skills/*/SKILL.md`.
+- Snapshot membawa `finance.trend`/`topCategories`, `seller.salesTrend`/`productPerformance`, `content.trend`/`platformPerformance`/`recentContent`, dan `dataQuality` agar agent bisa membandingkan baseline, menghitung dampak, dan menyebut keterbatasan data. Finding baru diminta menyertakan `evidence`, `priority`, `confidence`, dan `steps`; field ini opsional saat parsing agar output lama tetap kompatibel.
 - Tool PicoClaw yang aktif hanya `read_file`, `list_dir`, dan `delegate` (delegasi sinkron); `spawn`, `exec`, `write_file`, `edit_file`, `web`, `mcp`, dan `cron` dimatikan.
 - Memory lintas-run diambil dari `context.json` bagian `memory` (notifikasi terakhir + briefing terakhir), bukan `MEMORY.md` bersama, agar tidak bocor antar-owner.
 - Setiap run memakai session PicoClaw terisolasi `agent:muhe:nuanscape:<runId>`; snapshot ditulis ke workspace lalu dihapus setelah run.

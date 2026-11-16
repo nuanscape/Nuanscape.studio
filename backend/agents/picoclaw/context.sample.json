@@ -8,6 +8,28 @@
       "net": 7300000,
       "savingsRate": 39.5
     },
+    "trend": {
+      "periodDays": 30,
+      "current": { "income": 18500000, "expense": 11200000, "net": 7300000 },
+      "previous": { "income": 16000000, "expense": 10000000, "net": 6000000 },
+      "deltaPct": { "income": 15.6, "expense": 12, "net": 21.7 }
+    },
+    "topCategories": [
+      {
+        "category": "Ads",
+        "amount": 4600000,
+        "sharePct": 41.1,
+        "budgetLimit": 4000000,
+        "budgetUsagePct": 115
+      },
+      {
+        "category": "Operasional",
+        "amount": 2100000,
+        "sharePct": 18.8,
+        "budgetLimit": 3000000,
+        "budgetUsagePct": 70
+      }
+    ],
     "budgets": [
       { "category": "Ads", "limit": 4000000, "spent": 4600000 },
       { "category": "Operasional", "limit": 3000000, "spent": 2100000 }
@@ -31,6 +53,34 @@
       "orders": 142,
       "inventoryValue": 18750000
     },
+    "salesTrend": {
+      "periodDays": 30,
+      "current": { "revenue": 9200000, "orders": 48, "units": 61, "profit": 2140000 },
+      "previous": { "revenue": 8100000, "orders": 44, "units": 56, "profit": 1900000 },
+      "deltaPct": { "revenue": 13.6, "orders": 9.1, "units": 8.9, "profit": 12.6 }
+    },
+    "productPerformance": [
+      {
+        "sku": "LM-LAMP-01",
+        "name": "Lampu Meja",
+        "revenue": 5400000,
+        "units": 36,
+        "profit": 3112200,
+        "marginPct": 57.6,
+        "stock": 6,
+        "minStock": 10
+      },
+      {
+        "sku": "DK-DESK-02",
+        "name": "Desk Organizer",
+        "revenue": 3800000,
+        "units": 25,
+        "profit": 1850000,
+        "marginPct": 48.7,
+        "stock": 24,
+        "minStock": 8
+      }
+    ],
     "criticalStock": [
       { "sku": "LM-LAMP-01", "name": "Lampu Meja", "stock": 6, "minStock": 10 }
     ],
@@ -46,6 +96,44 @@
       "ideas": 4,
       "engagement": 7.8
     },
+    "trend": {
+      "periodDays": 30,
+      "current": { "published": 5, "views": 128400, "engagement": 8.2 },
+      "previous": { "published": 4, "views": 96200, "engagement": 7.4 },
+      "deltaPct": { "published": 25, "views": 33.5, "engagement": 10.8 }
+    },
+    "platformPerformance": [
+      {
+        "platform": "YouTube",
+        "published": 5,
+        "views": 128400,
+        "avgEngagement": 8.2
+      },
+      {
+        "platform": "TikTok",
+        "published": 7,
+        "views": 86200,
+        "avgEngagement": 7.5
+      }
+    ],
+    "recentContent": [
+      {
+        "title": "Rahasia Produktivitas",
+        "platform": "YouTube",
+        "status": "Published",
+        "scheduledAt": "2026-11-10",
+        "views": 48200,
+        "engagement": 9.1
+      },
+      {
+        "title": "Setup Meja Minimalis",
+        "platform": "TikTok",
+        "status": "In Production",
+        "scheduledAt": "2026-11-14",
+        "views": 0,
+        "engagement": 0
+      }
+    ],
     "topContent": [
       {
         "title": "Rahasia Produktivitas",
@@ -60,6 +148,17 @@
         "status": "Script Ready",
         "platform": "TikTok"
       }
-    ]
+    ],
+    "youtubeResearch": {
+      "configured": false,
+      "reason": "Riset YouTube tidak tersedia pada snapshot contoh."
+    }
+  },
+  "dataQuality": {
+    "financeTransactions": 28,
+    "orders": 142,
+    "products": 18,
+    "contentItems": 16,
+    "historicalBaseline": true
   }
 }

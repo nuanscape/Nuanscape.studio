@@ -29,4 +29,14 @@ describe('agent parser', () => {
     )
     expect(result.findings[0]?.tone).toBe('neutral')
   })
+
+  it('menerima evidence, prioritas, dan langkah tindakan', () => {
+    const result = parseAgentResult(
+      '<<<NUANSCAPE_JSON>>>{"summary":"Budget iklan melewati batas.","findings":[{"agent":"asep","title":"Budget iklan terlampaui","detail":"Spent 4.600.000 dari limit 4.000.000.","why":"Biaya akuisisi naik.","tone":"warning","action":"Turunkan budget iklan 15%.","priority":"high","confidence":0.86,"evidence":[{"metric":"budgetUsage","value":"115%","baseline":"100%","source":"finance.topCategories"}],"impact":{"metric":"overspend","value":600000,"unit":"Rp"},"steps":["Pause campaign ROAS rendah.","Evaluasi ulang budget Senin."]}]}<<<END_NUANSCAPE_JSON>>>',
+    )
+    expect(result.findings[0]?.priority).toBe('high')
+    expect(result.findings[0]?.confidence).toBe(0.86)
+    expect(result.findings[0]?.evidence?.[0]?.metric).toBe('budgetUsage')
+    expect(result.findings[0]?.steps).toHaveLength(2)
+  })
 })

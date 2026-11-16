@@ -35,7 +35,7 @@ describe('Agent Pipeline & Snapshot Integration', () => {
           category: 'Penjualan',
           description: 'Penjualan Batch 1',
           amount: 15_000_000,
-          date: new Date('2026-11-01'),
+          date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
           account: 'Business',
         },
         {
@@ -44,7 +44,7 @@ describe('Agent Pipeline & Snapshot Integration', () => {
           category: 'Ads',
           description: 'Meta Ads',
           amount: 4_500_000,
-          date: new Date('2026-11-02'),
+          date: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000),
           account: 'Business',
         },
       ],
@@ -92,7 +92,7 @@ describe('Agent Pipeline & Snapshot Integration', () => {
         total: 2_400_000,
         status: 'Completed',
         marketplace: 'Shopee',
-        date: new Date('2026-11-05'),
+        date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
       },
     })
 
@@ -104,7 +104,7 @@ describe('Agent Pipeline & Snapshot Integration', () => {
         niche: 'Creative',
         format: 'long',
         status: 'Published',
-        scheduledAt: new Date('2026-11-10'),
+        scheduledAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
         views: 48_200,
         engagement: 9.1,
       },
@@ -156,10 +156,24 @@ describe('Agent Pipeline & Snapshot Integration', () => {
     expect(snapshot.finance.summary.net).toBe(10_500_000)
     expect(snapshot.finance.budgets[0]?.category).toBe('Ads')
     expect(snapshot.finance.budgets[0]?.spent).toBe(4_500_000)
+    expect(snapshot.finance.trend.periodDays).toBe(30)
+    expect(snapshot.finance.trend.current.income).toBe(15_000_000)
+    expect(snapshot.finance.trend.current.expense).toBe(4_500_000)
+    expect(snapshot.finance.topCategories[0]?.category).toBe('Ads')
+    expect(snapshot.finance.topCategories[0]?.sharePct).toBe(100)
+    expect(snapshot.finance.topCategories[0]?.budgetUsagePct).toBe(112.5)
     expect(snapshot.seller.criticalStock.length).toBe(1)
     expect(snapshot.seller.criticalStock[0]?.name).toBe('Meja Kerja Ergonomis')
+    expect(snapshot.seller.salesTrend.current.revenue).toBe(2_400_000)
+    expect(snapshot.seller.salesTrend.current.units).toBe(2)
+    expect(snapshot.seller.productPerformance[0]?.marginPct).toBe(41.7)
     expect(snapshot.content.summary.published).toBe(1)
     expect(snapshot.content.summary.engagement).toBe(9.1)
+    expect(snapshot.content.trend.current.published).toBe(1)
+    expect(snapshot.content.platformPerformance[0]?.platform).toBe('YouTube')
+    expect(snapshot.content.platformPerformance[0]?.views).toBe(48_200)
+    expect(snapshot.dataQuality.historicalBaseline).toBe(false)
+    expect(snapshot.dataQuality.financeTransactions).toBe(2)
     expect(snapshot.content.topContent[0]?.views).toBe(48_200)
     expect(snapshot.content.topContent[0]?.engagement).toBe(9.1)
     expect(snapshot.memory.recentNotifications.length).toBeGreaterThanOrEqual(1)
