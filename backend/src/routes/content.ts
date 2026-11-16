@@ -1,5 +1,6 @@
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod'
 import { z } from 'zod'
+import { badRequest } from '../lib/errors.js'
 import { resolveOwnerId } from '../lib/owner.js'
 import {
   generateScriptFromIdea,
@@ -44,6 +45,7 @@ import {
   youtubeResearchAuthForOwner,
 } from '../services/youtube.js'
 import { emptyYouTubeResearch, researchYouTube, type YouTubeResearchResult } from '../services/youtube-research.js'
+import { publishContentToYouTube, YOUTUBE_PRIVACY_VALUES } from '../services/youtube-publish.js'
 
 const formatSchema = z.enum(['long', 'short'])
 const platformSchema = z.enum(PLATFORMS)
@@ -133,6 +135,11 @@ const updateItemBody = z.object({
   musicStyle: z.string().trim().max(100).nullable().optional(),
   generated: z.boolean().optional(),
   sourceIdeaId: z.string().min(1).nullable().optional(),
+})
+
+const publishYouTubeBody = z.object({
+  privacyStatus: z.enum(YOUTUBE_PRIVACY_VALUES).default('private'),
+  confirm: z.boolean().optional(),
 })
 
 const createIdeaBody = z.object({
@@ -511,6 +518,30 @@ export const contentRoutes: FastifyPluginAsyncZod = async (app) => {
     async (request) => {
       const ownerId = await resolveOwnerId(request)
       return deleteItem(ownerId, request.params.id)
+    },
+  )
+
+  app.post(
+    '/content/items/:id/youtube-upload',
+    {
+      schema: {
+        tags: ['content'],
+        summary: 'Upload konten ke YouTube setelah persetujuan',
+        params: idParams,
+        body: publishYouTubeBody,
+      },
+    },
+    async (request) => {
+      const ownerId = await resolveOwnerId(request)
+      if (request.body.confirm !== true) {
+        throw badRequest(
+          'YOUTUBE_APPROVAL_REQUIRED',
+          'Upload YouTube memerlukan persetujuan eksplisit.',
+        )
+      }
+      return publishContentToYouTube(ownerId, request.params.id, {
+        privacyStatus: request.body.privacyStatus,
+      })
     },
   )
 

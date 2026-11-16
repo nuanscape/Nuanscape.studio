@@ -167,11 +167,11 @@ model User {
   sellerAdCampaigns    SellerAdCampaign[]
   sellerLedgerEntries  SellerLedgerEntry[]
 
-  automations     Automation[]
-  automationRuns  AutomationRun[]
-  notifications   AppNotification[]
-  briefingReports BriefingReport[]
-  headAgentConfig HeadAgentConfig?
+  automations       Automation[]
+  automationRuns    AutomationRun[]
+  notifications     AppNotification[]
+  briefingReports   BriefingReport[]
+  headAgentConfig   HeadAgentConfig?
   aiProviderConfigs AiProviderConfig[]
 
   @@map("users")
@@ -251,30 +251,36 @@ model PlatformAccount {
 }
 
 model ContentItem {
-  id             String   @id @default(cuid())
-  ownerId        String
-  title          String
-  platform       Platform
-  accountId      String?
-  niche          String
-  format         String
-  status         String
-  scheduledAt    DateTime
-  views          Int      @default(0)
-  engagement     Float    @default(0)
-  script         String?
-  thumbnail      String?
-  caption        String?
-  hashtags       String[] @default([])
-  previewUrl     String?
-  videoUrl       String?
-  thumbnailStyle String?
-  animationStyle String?
-  musicStyle     String?
-  generated      Boolean  @default(false)
-  sourceIdeaId   String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                String    @id @default(cuid())
+  ownerId           String
+  title             String
+  platform          Platform
+  accountId         String?
+  niche             String
+  format            String
+  status            String
+  scheduledAt       DateTime
+  views             Int       @default(0)
+  engagement        Float     @default(0)
+  script            String?
+  thumbnail         String?
+  caption           String?
+  hashtags          String[]  @default([])
+  previewUrl        String?
+  videoUrl          String?
+  youtubeVideoId    String?
+  youtubeUrl        String?
+  youtubePrivacy    String?
+  youtubeUploadedAt DateTime?
+  publishStatus     String?
+  publishError      String?
+  thumbnailStyle    String?
+  animationStyle    String?
+  musicStyle        String?
+  generated         Boolean   @default(false)
+  sourceIdeaId      String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   owner         User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   account       PlatformAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
@@ -808,22 +814,22 @@ model HeadAgentConfig {
 /// Kredensial provider LLM per owner. API key disimpan sebagai ciphertext
 /// AES-256-GCM; plaintext tidak pernah ditulis ke database.
 model AiProviderConfig {
-  id                String   @id @default(cuid())
-  ownerId           String
-  provider          String
-  baseUrl           String
-  model             String
-  encryptedKey      String
-  keyIv             String
-  keyTag            String
-  keyVersion        Int      @default(1)
-  keyHint           String
-  fingerprint       String
-  lastTestedAt      DateTime?
-  lastTestStatus    String?
-  lastTestMessage   String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id              String    @id @default(cuid())
+  ownerId         String
+  provider        String
+  baseUrl         String
+  model           String
+  encryptedKey    String
+  keyIv           String
+  keyTag          String
+  keyVersion      Int       @default(1)
+  keyHint         String
+  fingerprint     String
+  lastTestedAt    DateTime?
+  lastTestStatus  String?
+  lastTestMessage String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 

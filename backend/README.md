@@ -241,6 +241,7 @@ Semua endpoint content memakai prefix `/api/v1`. Kirim `Authorization: Bearer <a
 | GET | `/content/items/:id` | detail konten |
 | PATCH | `/content/items/:id` | ubah status/script/jadwal/caption/dll. |
 | DELETE | `/content/items/:id` | hapus konten |
+| POST | `/content/items/:id/youtube-upload` | upload video ke YouTube setelah approval (`confirm: true`, `privacyStatus`: `private`/`unlisted`/`public`); memakai resumable upload, menyimpan `youtubeVideoId`/`youtubeUrl`/`publishStatus`, dan mencatat notifikasi |
 | GET | `/content/ideas?format=&accountId=&platform=&approved=&q=` | daftar ide |
 | POST | `/content/ideas` | tambah ide |
 | PATCH | `/content/ideas/:id` | approve/unapprove ide |
@@ -256,6 +257,8 @@ Semua endpoint content memakai prefix `/api/v1`. Kirim `Authorization: Bearer <a
 | GET | `/content/calendar?format=&month=YYYY-MM&accountId=` | kalender per hari dalam bulan |
 
 Format `long` = YouTube; `short` = TikTok + Instagram. Nominal views integer, engagement float (persen).
+
+Upload YouTube membutuhkan scope `https://www.googleapis.com/auth/youtube.upload`; akun lama harus dihubungkan ulang dari halaman Account. Daftar akun mengembalikan `uploadReady` untuk YouTube. Agent tetap read-only: upload hanya dieksekusi backend setelah body `confirm: true`, dan hasilnya diaudit lewat `publishStatus`, `publishError`, serta notifikasi.
 
 ## Endpoint Finance
 

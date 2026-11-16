@@ -75,6 +75,25 @@ export function ContentAccountsPage() {
     }
   }
 
+  const reconnectYouTube = async (account: { format: 'long' | 'short'; niche: string }) => {
+    setOauthBusy(true)
+    try {
+      const { url } = await api.content.oauthUrl({
+        format: account.format,
+        niche: account.niche || undefined,
+      })
+      window.location.assign(url)
+    } catch (error) {
+      push({
+        title: 'OAuth belum siap',
+        description:
+          error instanceof Error ? error.message : 'GOOGLE_CLIENT_ID belum dikonfigurasi.',
+        tone: 'danger',
+      })
+      setOauthBusy(false)
+    }
+  }
+
   const connectYouTube = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const handleValue = handleInput.trim()
@@ -190,6 +209,24 @@ export function ContentAccountsPage() {
 
                       <p className="mt-2 text-[9px] text-text-muted">Sinkron: {formatDate(account.lastSync, 'd MMM yyyy HH:mm')}</p>
 
+                      {platform === 'YouTube' ? (
+                        <div className="mt-2 flex items-center justify-between gap-2 rounded-lg border border-line bg-white/[0.02] px-2 py-1.5">
+                          <Badge tone={account.uploadReady ? 'success' : 'outline'}>
+                            {account.uploadReady ? 'Upload siap' : 'Izin upload belum'}
+                          </Badge>
+                          {!account.uploadReady ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              loading={oauthBusy}
+                              onClick={() => reconnectYouTube(account)}
+                            >
+                              Beri izin upload
+                            </Button>
+                          ) : null}
+                        </div>
+                      ) : null}
+
                       <div className="mt-3 flex gap-2">
                         {linked ? (
                           <Button variant="secondary" size="sm" className="flex-1" onClick={() => unlinkAccount(account.id)}>
@@ -283,9 +320,9 @@ export function ContentAccountsPage() {
             </div>
           </div>
           <p className="text-[10px] leading-relaxed text-text-muted">
-            <strong className="text-text-secondary">Login Google</strong> memberi akses watch time
-            dan analytics penonton lewat OAuth 2.0. Tanpa OAuth, backend hanya menarik data publik
-            dan memerlukan <code className="text-text-secondary">YOUTUBE_API_KEY</code>.
+            <strong className="text-text-secondary">Login Google</strong> memberi akses watch time,
+            analytics penonton, dan izin upload video lewat OAuth 2.0. Tanpa OAuth, backend hanya
+            menarik data publik dan memerlukan <code className="text-text-secondary">YOUTUBE_API_KEY</code>.
           </p>
         </form>
       </Dialog>

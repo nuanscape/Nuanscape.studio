@@ -7,6 +7,7 @@ import type {
 } from '@prisma/client'
 import { badRequest, notFound } from '../lib/errors.js'
 import { prisma } from '../lib/prisma.js'
+import { hasYouTubeUploadScope } from '../lib/youtube-scopes.js'
 
 export const CONTENT_STATUSES = [
   'Researching',
@@ -121,6 +122,12 @@ export function mapItem(row: ContentItem) {
     ...(row.hashtags.length > 0 ? { hashtags: row.hashtags } : {}),
     ...(row.previewUrl ? { previewUrl: row.previewUrl } : {}),
     ...(row.videoUrl ? { videoUrl: row.videoUrl } : {}),
+    ...(row.youtubeVideoId ? { youtubeVideoId: row.youtubeVideoId } : {}),
+    ...(row.youtubeUrl ? { youtubeUrl: row.youtubeUrl } : {}),
+    ...(row.youtubePrivacy ? { youtubePrivacy: row.youtubePrivacy } : {}),
+    ...(row.youtubeUploadedAt ? { youtubeUploadedAt: iso(row.youtubeUploadedAt) } : {}),
+    ...(row.publishStatus ? { publishStatus: row.publishStatus } : {}),
+    ...(row.publishError ? { publishError: row.publishError } : {}),
     ...(row.thumbnailStyle ? { thumbnailStyle: row.thumbnailStyle } : {}),
     ...(row.animationStyle ? { animationStyle: row.animationStyle } : {}),
     ...(row.musicStyle ? { musicStyle: row.musicStyle } : {}),
@@ -177,6 +184,7 @@ export function mapAccount(row: PlatformAccount) {
     completionRate: row.completionRate,
     status: row.status,
     lastSync: iso(row.lastSync),
+    ...(row.platform === 'YouTube' ? { uploadReady: hasYouTubeUploadScope(row.oauthScopes) } : {}),
   }
 }
 

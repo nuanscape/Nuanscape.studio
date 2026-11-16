@@ -534,6 +534,22 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(body),
       }),
+    publishYouTube: (
+      id: string,
+      body: { privacyStatus: 'private' | 'unlisted' | 'public'; confirm: true },
+    ) =>
+      apiFetch<{
+        item: unknown
+        upload: {
+          videoId: string
+          url: string
+          privacyStatus: 'private' | 'unlisted' | 'public'
+          uploadedAt: string
+        }
+      }>(`/content/items/${id}/youtube-upload`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
   },
 
   providers: {

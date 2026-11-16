@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { AppError, badRequest, conflict, notFound } from '../lib/errors.js'
 import { prisma } from '../lib/prisma.js'
+import { YOUTUBE_UPLOAD_SCOPE } from '../lib/youtube-scopes.js'
 import { mapAccount } from './content.js'
 
 const API_BASE = 'https://www.googleapis.com/youtube/v3'
@@ -13,6 +14,7 @@ const MAX_VIDEOS = 100
 export const YOUTUBE_OAUTH_SCOPES = [
   'https://www.googleapis.com/auth/youtube.readonly',
   'https://www.googleapis.com/auth/yt-analytics.readonly',
+  YOUTUBE_UPLOAD_SCOPE,
 ]
 
 interface YouTubeAuth {

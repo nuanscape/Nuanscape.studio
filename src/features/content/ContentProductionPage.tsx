@@ -38,6 +38,7 @@ import {
   Search,
   ShieldAlert,
   Trash2,
+  Upload,
   Wand2,
   type LucideIcon,
 } from 'lucide-react'
@@ -367,6 +368,15 @@ export function ContentProductionPage() {
   const [phase, setPhase] = React.useState('')
   const [videoUrl, setVideoUrl] = React.useState<string | null>(null)
   const [previewUrl, setPreviewUrl] = React.useState<string | null>(null)
+  const [contentItemId, setContentItemId] = React.useState<string | null>(null)
+  const [uploadPrivacy, setUploadPrivacy] = React.useState<'private' | 'unlisted' | 'public'>('private')
+  const [uploading, setUploading] = React.useState(false)
+  const [uploadResult, setUploadResult] = React.useState<{
+    videoId: string
+    url: string
+    privacyStatus: 'private' | 'unlisted' | 'public'
+  } | null>(null)
+  const [uploadError, setUploadError] = React.useState<string | null>(null)
   const [generatedTitle, setGeneratedTitle] = React.useState('')
   const [savedDraft, setSavedDraft] = React.useState(false)
   const timers = React.useRef<number[]>([])
@@ -664,6 +674,10 @@ export function ContentProductionPage() {
           setPreviewUrl(res.media.previewUrl)
           setVideoUrl(res.media.videoUrl)
           setGeneratedTitle(title)
+          const storedItem = res.item as { id?: string } | null
+          setContentItemId(storedItem?.id ?? null)
+          setUploadResult(null)
+          setUploadError(null)
           if (res.item) backendSavedRef.current = true
           if (res.energy && typeof res.energy.current === 'number') {
             useContentStore.setState({ aiEnergy: res.energy.current, aiEnergyMax: res.energy.max })
@@ -717,6 +731,37 @@ export function ContentProductionPage() {
     a.rel = 'noopener'
     a.click()
     push({ title: 'Unduhan dimulai', description: 'Thumbnail murni siap dipakai', tone: 'success' })
+  }
+
+  const uploadToYouTube = async () => {
+    if (!contentItemId || uploading) return
+    const warning =
+      uploadPrivacy === 'public'
+        ? 'Video akan langsung PUBLIK di YouTube dan bisa ditonton siapa saja. Lanjutkan?'
+        : uploadPrivacy === 'unlisted'
+          ? 'Video akan diunggah sebagai Unlisted (hanya lewat link). Lanjutkan?'
+          : 'Video akan diunggah sebagai Private (hanya Anda). Lanjutkan?'
+    if (!window.confirm(warning)) return
+    setUploading(true)
+    setUploadError(null)
+    try {
+      const res = await api.content.publishYouTube(contentItemId, {
+        privacyStatus: uploadPrivacy,
+        confirm: true,
+      })
+      setUploadResult(res.upload)
+      push({
+        title: 'Video terunggah ke YouTube',
+        description: `Status ${res.upload.privacyStatus}. ${res.upload.url}`,
+        tone: 'success',
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Upload ke YouTube gagal.'
+      setUploadError(message)
+      push({ title: 'Upload YouTube gagal', description: message, tone: 'warning' })
+    } finally {
+      setUploading(false)
+    }
   }
 
   const productionLines = () => {
@@ -803,6 +848,11 @@ export function ContentProductionPage() {
     setDesignTheme('cinematic')
     setVideoUrl(null)
     setPreviewUrl(null)
+    setContentItemId(null)
+    setUploadPrivacy('private')
+    setUploading(false)
+    setUploadResult(null)
+    setUploadError(null)
     setProgress(0)
     setPhase('')
     setSavedDraft(false)
@@ -1619,7 +1669,68 @@ export function ContentProductionPage() {
               )}
               <div><p className="text-[10px] uppercase tracking-[0.1em] text-text-muted">Thumbnail</p><p className="mt-1 text-text-secondary">{thumbnail}</p></div>
               <div><p className="text-[10px] uppercase tracking-[0.1em] text-text-muted">Deskripsi</p><p className="mt-1 leading-relaxed text-text-secondary">{description}</p></div>
-              <div className="rounded-lg border border-teal/25 bg-teal/[0.05] p-3 text-[11px] text-teal"><Play className="mr-1 inline size-3.5" /> Video siap diposting ke {platform} - {selectedAccount?.name ?? 'akun terpilih'}</div>
+              {platform === 'YouTube' ? (
+                <div className="rounded-xl border border-teal/25 bg-teal/[0.04] p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="flex items-center gap-1.5 text-[11px] font-medium text-text-primary">
+                      <Upload className="size-3.5 text-teal" /> Upload ke YouTube
+                    </p>
+                    {uploadResult ? <Badge tone="success">Terunggah</Badge> : null}
+                  </div>
+                  {uploadResult ? (
+                    <div className="mt-2 space-y-1.5">
+                      <a
+                        href={uploadResult.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
+                      >
+                        Buka video di YouTube <ExternalLink className="size-3" />
+                      </a>
+                      <p className="text-[10px] text-text-muted">
+                        Status {uploadResult.privacyStatus} - ID {uploadResult.videoId}. Upload dieksekusi backend setelah persetujuan.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                        <Select
+                          value={uploadPrivacy}
+                          onChange={(event) => setUploadPrivacy(event.target.value as 'private' | 'unlisted' | 'public')}
+                          className="h-9 sm:w-40"
+                          disabled={uploading}
+                        >
+                          <option value="private">Private</option>
+                          <option value="unlisted">Unlisted</option>
+                          <option value="public">Public</option>
+                        </Select>
+                        <Button
+                          onClick={uploadToYouTube}
+                          disabled={!contentItemId || uploading || selectedAccount?.uploadReady === false}
+                        >
+                          <Upload /> {uploading ? 'Mengunggah...' : 'Upload ke YouTube'}
+                        </Button>
+                      </div>
+                      {selectedAccount?.uploadReady === false ? (
+                        <p className="mt-1.5 text-[10px] text-amber-300">
+                          Akun belum memberi izin upload. Buka halaman Akun lalu klik Beri izin upload.
+                        </p>
+                      ) : null}
+                      <p className="mt-1.5 text-[10px] text-text-muted">
+                        Agen hanya mengusulkan. Upload dijalankan backend setelah Anda menyetujui status privasi.
+                      </p>
+                    </>
+                  )}
+                  {!contentItemId && !uploadResult ? (
+                    <p className="mt-1 text-[10px] text-amber-300">
+                      Konten belum tersimpan sebagai draft backend, jadi upload belum bisa dijalankan.
+                    </p>
+                  ) : null}
+                  {uploadError ? <p className="mt-1 text-[10px] text-red-300">{uploadError}</p> : null}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-teal/25 bg-teal/[0.05] p-3 text-[11px] text-teal"><Play className="mr-1 inline size-3.5" /> Video siap diposting ke {platform} - {selectedAccount?.name ?? 'akun terpilih'}</div>
+              )}
             </div>
           </Card>
         </div>

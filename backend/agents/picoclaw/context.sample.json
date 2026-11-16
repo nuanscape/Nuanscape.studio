@@ -123,7 +123,10 @@
         "status": "Published",
         "scheduledAt": "2026-11-10",
         "views": 48200,
-        "engagement": 9.1
+        "engagement": 9.1,
+        "videoUrl": "https://media.example.com/video/demo-rahasia-produktivitas.mp4",
+        "youtubeUrl": "https://www.youtube.com/watch?v=demo0000001",
+        "publishStatus": "uploaded"
       },
       {
         "title": "Setup Meja Minimalis",

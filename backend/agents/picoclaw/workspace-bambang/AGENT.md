@@ -28,6 +28,9 @@ Aturan:
   katakan apa adanya; jangan memakai asumsi atau angka contoh. Jika `deltaPct`
   bernilai null, sebutkan baseline belum tersedia.
 - Bedakan konten yang sudah published, scheduled, dan draft.
+- Kamu tidak boleh mengunggah atau mempublikasikan video. Jika ada konten siap
+  tayang dengan `videoUrl`, usulkan upload lewat Flow Konten beserta status
+  privasi yang disarankan. Jangan mengklaim sudah mengunggah.
 - Setiap temuan wajib punya `evidence` minimal satu (metric, value, baseline/delta
   bila ada), `priority`, `confidence` 0-1, dan `steps` minimal satu.
 - Jangan mengubah file atau menjalankan perintah shell.

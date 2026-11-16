@@ -279,6 +279,7 @@ describe('YouTube OAuth 2.0', () => {
     const scope = url.searchParams.get('scope') ?? ''
     expect(scope).toContain('youtube.readonly')
     expect(scope).toContain('yt-analytics.readonly')
+    expect(scope).toContain('youtube.upload')
     expect(url.searchParams.get('state')).toBe('state-token')
   })
 

@@ -121,6 +121,9 @@ export interface AgentContextSnapshot {
       scheduledAt: string
       views: number
       engagement: number
+      videoUrl?: string
+      youtubeUrl?: string
+      publishStatus?: string
     }>
     topContent: Array<{
       title: string
@@ -532,6 +535,9 @@ export async function buildAgentSnapshot(
     scheduledAt: item.scheduledAt.toISOString().slice(0, 10),
     views: item.views,
     engagement: item.engagement,
+    ...(item.videoUrl ? { videoUrl: item.videoUrl } : {}),
+    ...(item.youtubeUrl ? { youtubeUrl: item.youtubeUrl } : {}),
+    ...(item.publishStatus ? { publishStatus: item.publishStatus } : {}),
   }))
 
   const pipeline = inProductionItems.slice(0, 5).map((item) => ({

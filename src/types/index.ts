@@ -79,6 +79,7 @@ export interface PlatformAccount {
   status: 'Active' | 'Growing' | 'Paused'
   lastSync: string
   linked?: boolean
+  uploadReady?: boolean
 }
 
 export interface ContentItem {
@@ -96,6 +97,12 @@ export interface ContentItem {
   thumbnail?: string
   previewUrl?: string
   videoUrl?: string
+  youtubeVideoId?: string
+  youtubeUrl?: string
+  youtubePrivacy?: 'private' | 'unlisted' | 'public'
+  youtubeUploadedAt?: string
+  publishStatus?: 'uploading' | 'uploaded' | 'failed'
+  publishError?: string
   caption?: string
   thumbnailStyle?: string
   animationStyle?: string

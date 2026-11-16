@@ -1,12 +1,16 @@
 import * as React from 'react'
-import { Play } from 'lucide-react'
+import { ExternalLink, Play, Upload } from 'lucide-react'
 import { PageHeader, SectionHeader } from '@/components/shared/page-header'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Select } from '@/components/ui/input'
 import { platformColor } from '@/features/content/components/content-ui'
 import { useContentStore } from '@/stores/content-store'
+import { useToastStore } from '@/stores/app-store'
+import { api } from '@/lib/api-client'
 import { formatDate, formatNumber } from '@/lib/utils'
-import type { Platform } from '@/types'
+import type { ContentItem, Platform } from '@/types'
 
 const platforms: Platform[] = ['YouTube', 'TikTok', 'Instagram']
 
@@ -26,7 +30,44 @@ function Thumb({ title, url, platform }: { title: string; url?: string; platform
 export function ContentDraftsPage() {
   const items = useContentStore((s) => s.items)
   const accounts = useContentStore((s) => s.accounts)
+  const refresh = useContentStore((s) => s.refresh)
+  const { push } = useToastStore()
+  const [uploadPrivacy, setUploadPrivacy] = React.useState<
+    Record<string, 'private' | 'unlisted' | 'public'>
+  >({})
+  const [uploadingId, setUploadingId] = React.useState<string | null>(null)
+  const [uploaded, setUploaded] = React.useState<Record<string, string>>({})
+  const [uploadErrors, setUploadErrors] = React.useState<Record<string, string>>({})
   const drafts = items.filter((i) => i.generated || i.previewUrl || i.videoUrl)
+
+  const uploadDraft = async (item: ContentItem) => {
+    const privacy = uploadPrivacy[item.id] ?? 'private'
+    const warning =
+      privacy === 'public'
+        ? 'Video akan langsung PUBLIK di YouTube dan bisa ditonton siapa saja. Lanjutkan?'
+        : privacy === 'unlisted'
+          ? 'Video akan diunggah sebagai Unlisted (hanya lewat link). Lanjutkan?'
+          : 'Video akan diunggah sebagai Private (hanya Anda). Lanjutkan?'
+    if (!window.confirm(warning)) return
+    setUploadingId(item.id)
+    setUploadErrors((prev) => ({ ...prev, [item.id]: '' }))
+    try {
+      const res = await api.content.publishYouTube(item.id, { privacyStatus: privacy, confirm: true })
+      setUploaded((prev) => ({ ...prev, [item.id]: res.upload.url }))
+      await refresh()
+      push({
+        title: 'Video terunggah ke YouTube',
+        description: `Status ${res.upload.privacyStatus}. ${res.upload.url}`,
+        tone: 'success',
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Upload ke YouTube gagal.'
+      setUploadErrors((prev) => ({ ...prev, [item.id]: message }))
+      push({ title: 'Upload YouTube gagal', description: message, tone: 'warning' })
+    } finally {
+      setUploadingId(null)
+    }
+  }
 
   return (
     <div>
@@ -88,6 +129,52 @@ export function ContentDraftsPage() {
                                   <span>·</span>
                                   <Badge tone={item.status === 'Published' ? 'success' : 'info'} className="text-[8px]">{item.status}</Badge>
                                 </div>
+                                {item.platform === 'YouTube' && item.videoUrl ? (
+                                  <div className="mt-2 border-t border-line pt-2">
+                                    {item.youtubeUrl || uploaded[item.id] ? (
+                                      <a
+                                        href={item.youtubeUrl ?? uploaded[item.id]}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline"
+                                      >
+                                        Buka di YouTube <ExternalLink className="size-3" />
+                                      </a>
+                                    ) : (
+                                      <>
+                                        <div className="flex gap-1.5">
+                                          <Select
+                                            value={uploadPrivacy[item.id] ?? 'private'}
+                                            onChange={(event) =>
+                                              setUploadPrivacy((prev) => ({
+                                                ...prev,
+                                                [item.id]: event.target.value as 'private' | 'unlisted' | 'public',
+                                              }))
+                                            }
+                                            className="h-7 flex-1 text-[10px]"
+                                            disabled={uploadingId === item.id}
+                                          >
+                                            <option value="private">Private</option>
+                                            <option value="unlisted">Unlisted</option>
+                                            <option value="public">Public</option>
+                                          </Select>
+                                          <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            className="h-7 px-2 text-[10px]"
+                                            loading={uploadingId === item.id}
+                                            onClick={() => uploadDraft(item)}
+                                          >
+                                            <Upload /> Upload
+                                          </Button>
+                                        </div>
+                                        {uploadErrors[item.id] ? (
+                                          <p className="mt-1 text-[9px] leading-snug text-red-300">{uploadErrors[item.id]}</p>
+                                        ) : null}
+                                      </>
+                                    )}
+                                  </div>
+                                ) : null}
                               </div>
                             </div>
                           ))}
