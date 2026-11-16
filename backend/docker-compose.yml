@@ -1,0 +1,46 @@
+name: nuanscape
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: nuanscape-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nuanscape
+      POSTGRES_PASSWORD: nuanscape
+      POSTGRES_DB: nuanscape
+    ports:
+      - "5434:5432"
+    volumes:
+      - nuanscape_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nuanscape -d nuanscape"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    profiles: ["full"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nuanscape-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 8790
+      DATABASE_URL: postgresql://nuanscape:nuanscape@db:5432/nuanscape?schema=public
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      LOG_LEVEL: info
+      SWAGGER_ENABLED: "true"
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET wajib diisi minimal 32 karakter}
+      DEMO_OWNER_EMAIL: ${DEMO_OWNER_EMAIL:-demo@nuanscape.studio}
+    ports:
+      - "8790:8790"
+
+volumes:
+  nuanscape_pgdata:

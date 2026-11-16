@@ -96,7 +96,7 @@ export function ContentLibraryPage() {
           >
             <Upload className="size-5" />
             <span className="text-[11px] font-medium">Tambah aset baru</span>
-            <span className="text-[9px]">Metadata demo</span>
+            <span className="text-[9px]">Metadata aset</span>
           </button>
 
           {filtered.map((asset) => {
@@ -153,7 +153,7 @@ export function ContentLibraryPage() {
 
         <div className="border-t border-line px-4 py-3">
           <p className="text-[10px] text-text-muted">
-            Library menyimpan metadata demo di browser. File asli tidak diunggah atau disimpan.
+            Library menyimpan metadata aset di database. File asli tidak diunggah atau disimpan.
           </p>
         </div>
       </Card>

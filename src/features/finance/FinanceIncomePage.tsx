@@ -22,6 +22,8 @@ export function FinanceIncomePage() {
   const byCategory = categoryTotals(transactions, 'income')
   const donut = byCategory.map((c, i) => ({ ...c, color: palette[i % palette.length] }))
   const recurring = income.filter((t) => t.recurring !== 'none')
+  const recurringTotal = recurring.reduce((a, t) => a + t.amount, 0)
+  const consistency = summary.income > 0 ? (recurringTotal / summary.income) * 100 : 0
   const avg = income.length ? summary.income / income.length : 0
   const top = byCategory[0]
 
@@ -53,13 +55,13 @@ export function FinanceIncomePage() {
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Total pemasukan" value={formatIDR(summary.income)} delta={12.4} deltaLabel="vs periode lalu" icon={<Wallet />} accent="yellow" />
-        <MetricCard label="Rata-rata / transaksi" value={formatIDR(avg)} delta={4.1} deltaLabel={`${income.length} transaksi`} icon={<TrendingUp />} accent="teal" />
+        <MetricCard label="Total pemasukan" value={formatIDR(summary.income)} deltaLabel={`${income.length} transaksi`} icon={<Wallet />} accent="yellow" />
+        <MetricCard label="Rata-rata / transaksi" value={formatIDR(avg)} deltaLabel={`${income.length} transaksi`} icon={<TrendingUp />} accent="teal" />
         <MetricCard label="Pemasukan berulang" value={`${recurring.length} sumber`} deltaLabel={`${formatIDR(recurring.reduce((a, t) => a + t.amount, 0))} total`} icon={<Repeat />} accent="orange" />
         <MetricCard
           label="Sumber terbesar"
           value={top?.name ?? '—'}
-          deltaLabel={top ? `${formatPercent((top.value / summary.income) * 100)} dari total` : undefined}
+          deltaLabel={top && summary.income > 0 ? `${formatPercent((top.value / summary.income) * 100)} dari total` : undefined}
           icon={<CalendarClock />}
           accent="pink"
         />
@@ -68,25 +70,35 @@ export function FinanceIncomePage() {
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.5fr_1fr]">
         <Card className="p-5">
           <SectionHeader title="Tren pemasukan" description="Total per bulan dari transaksi tercatat." />
-          <BarTrendChart
-            data={monthly}
-            xKey="label"
-            series={[{ key: 'income', label: 'Income', color: '#F5D64B' }]}
-            height={240}
-          />
+          {monthly.length > 0 ? (
+            <BarTrendChart
+              data={monthly}
+              xKey="label"
+              series={[{ key: 'income', label: 'Income', color: '#F5D64B' }]}
+              height={240}
+            />
+          ) : (
+            <p className="py-16 text-center text-[11px] text-text-muted">Belum ada pemasukan tercatat.</p>
+          )}
         </Card>
         <Card className="p-5">
           <SectionHeader title="Komposisi sumber" description="Kontribusi tiap kategori" />
-          <DonutChart data={donut} height={180} centerValue={formatIDR(summary.income, { compact: true })} centerLabel="total income" />
-          <div className="mt-3 space-y-2">
-            {byCategory.slice(0, 5).map((c, i) => (
-              <div key={c.name} className="flex items-center gap-2 text-[11px]">
-                <span className="size-2 rounded-full" style={{ backgroundColor: palette[i % palette.length] }} />
-                <span className="flex-1 text-text-secondary">{c.name}</span>
-                <span className="num text-text-primary">{formatPercent((c.value / summary.income) * 100)}</span>
+          {donut.length > 0 && summary.income > 0 ? (
+            <>
+              <DonutChart data={donut} height={180} centerValue={formatIDR(summary.income, { compact: true })} centerLabel="total income" />
+              <div className="mt-3 space-y-2">
+                {byCategory.slice(0, 5).map((c, i) => (
+                  <div key={c.name} className="flex items-center gap-2 text-[11px]">
+                    <span className="size-2 rounded-full" style={{ backgroundColor: palette[i % palette.length] }} />
+                    <span className="flex-1 text-text-secondary">{c.name}</span>
+                    <span className="num text-text-primary">{formatPercent((c.value / summary.income) * 100)}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          ) : (
+            <p className="py-16 text-center text-[11px] text-text-muted">Belum ada pemasukan tercatat.</p>
+          )}
         </Card>
       </div>
 
@@ -123,10 +135,10 @@ export function FinanceIncomePage() {
           )}
           <div className="mt-4 rounded-xl border border-line bg-white/[0.02] p-3">
             <p className="text-[10px] uppercase tracking-[0.1em] text-text-muted">Konsistensi pemasukan</p>
-            <Progress value={recurring.length ? 74 : 22} className="mt-2" size="sm" />
+            <Progress value={consistency} className="mt-2" size="sm" />
             <p className="mt-2 text-[10px] leading-relaxed text-text-muted">
               {recurring.length
-                ? 'Sebagian pemasukan berulang. Sisanya berbasis proyek dan perlu cadangan kas lebih besar.'
+                ? `${formatPercent(consistency)} dari pemasukan tercatat berasal dari sumber berulang.`
                 : 'Tambahkan pemasukan berulang agar AI bisa memproyeksikan arus kas lebih akurat.'}
             </p>
           </div>

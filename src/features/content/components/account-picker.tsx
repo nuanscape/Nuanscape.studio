@@ -2,10 +2,11 @@ import { ArrowRight, CheckCircle2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { ContentFormatBadge } from '@/features/content/components/content-flow'
 import { PlatformLogo, platformColor } from '@/features/content/components/content-ui'
-import { MAX_ACCOUNTS_PER_PLATFORM, platformAccounts } from '@/data/mock'
+import { useContentStore } from '@/stores/content-store'
 import { cn, formatNumber } from '@/lib/utils'
 import type { Platform, PlatformAccount } from '@/types'
 
+const MAX_ACCOUNTS_PER_PLATFORM = 3
 const platformOrder: Platform[] = ['YouTube', 'TikTok', 'Instagram']
 
 const statusTone: Record<PlatformAccount['status'], string> = {
@@ -30,10 +31,12 @@ export function AccountPicker({
   activeId?: string | null
   onSelect: (id: string) => void
 }) {
+  const storeAccounts = useContentStore((s) => s.accounts)
+
   return (
     <div className="space-y-6">
       {platformOrder.map((platform) => {
-        const accounts = platformAccounts.filter((account) => account.platform === platform)
+        const accounts = storeAccounts.filter((account) => account.platform === platform)
         return (
           <section key={platform}>
             <div className="mb-3 flex flex-wrap items-center gap-2.5">
@@ -55,6 +58,11 @@ export function AccountPicker({
               <span className="text-[10px] text-text-muted">Pilih akun untuk memulai flow</span>
             </div>
 
+            {accounts.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-[11px] text-text-muted">
+                Belum ada akun {platform} terhubung.
+              </div>
+            ) : (
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
               {accounts.map((account) => {
                 const active = activeId === account.id
@@ -140,6 +148,7 @@ export function AccountPicker({
                 )
               })}
             </div>
+            )}
           </section>
         )
       })}

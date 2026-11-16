@@ -27,6 +27,8 @@ export function FinanceExpensesPage() {
   const unusual = expenses.filter((t) => t.amount > avg * 1.6)
   const recurring = expenses.filter((t) => t.recurring !== 'none')
   const filtered = category ? expenses.filter((t) => t.category === category) : expenses
+  const now = new Date()
+  const daysLeft = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate()
 
   return (
     <div>
@@ -41,7 +43,7 @@ export function FinanceExpensesPage() {
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Total pengeluaran" value={formatIDR(summary.expense)} delta={-8.2} deltaLabel="vs periode lalu" icon={<TrendingDown />} tone="warning" accent="yellow" />
+        <MetricCard label="Total pengeluaran" value={formatIDR(summary.expense)} deltaLabel={`${expenses.length} transaksi`} icon={<TrendingDown />} tone="warning" accent="yellow" />
         <MetricCard label="Rata-rata / transaksi" value={formatIDR(avg)} deltaLabel={`${expenses.length} transaksi`} icon={<Receipt />} accent="teal" />
         <MetricCard label="Kategori terbesar" value={byCategory[0]?.name ?? '-'} deltaLabel={byCategory[0] ? formatIDR(byCategory[0].value) : undefined} icon={<AlertTriangle />} tone="warning" accent="orange" />
         <MetricCard label="Biaya berulang" value={`${recurring.length} item`} deltaLabel={`${formatIDR(recurring.reduce((a, t) => a + t.amount, 0))} terikat`} icon={<Repeat />} accent="pink" />
@@ -50,29 +52,33 @@ export function FinanceExpensesPage() {
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <Card className="p-5">
           <SectionHeader title="Distribusi pengeluaran" description="Klik kategori untuk memfilter tabel di bawah." />
-          <div className="grid items-center gap-4 sm:grid-cols-[1fr_1fr]">
-            <DonutChart data={donut} height={200} centerValue={formatIDR(summary.expense, { compact: true })} centerLabel="total" />
-            <div className="space-y-2">
-              {byCategory.map((c, i) => {
-                const active = category === c.name
-                return (
-                  <button
-                    key={c.name}
-                    onClick={() => setCategory(active ? null : c.name)}
-                    className={cn(
-                      'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11px] transition-colors',
-                      active ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:bg-white/[0.03]',
-                    )}
-                  >
-                    <span className="size-2 rounded-full" style={{ backgroundColor: palette[i % palette.length] }} />
-                    <span className="flex-1">{c.name}</span>
-                    <span className="num">{formatPercent((c.value / summary.expense) * 100)}</span>
-                    <span className="num w-16 text-right text-text-muted">{formatIDR(c.value, { compact: true })}</span>
-                  </button>
-                )
-              })}
+          {donut.length > 0 && summary.expense > 0 ? (
+            <div className="grid items-center gap-4 sm:grid-cols-[1fr_1fr]">
+              <DonutChart data={donut} height={200} centerValue={formatIDR(summary.expense, { compact: true })} centerLabel="total" />
+              <div className="space-y-2">
+                {byCategory.map((c, i) => {
+                  const active = category === c.name
+                  return (
+                    <button
+                      key={c.name}
+                      onClick={() => setCategory(active ? null : c.name)}
+                      className={cn(
+                        'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[11px] transition-colors',
+                        active ? 'bg-primary/10 text-primary' : 'text-text-secondary hover:bg-white/[0.03]',
+                      )}
+                    >
+                      <span className="size-2 rounded-full" style={{ backgroundColor: palette[i % palette.length] }} />
+                      <span className="flex-1">{c.name}</span>
+                      <span className="num">{formatPercent((c.value / summary.expense) * 100)}</span>
+                      <span className="num w-16 text-right text-text-muted">{formatIDR(c.value, { compact: true })}</span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
-          </div>
+          ) : (
+            <p className="py-16 text-center text-[11px] text-text-muted">Belum ada transaksi pengeluaran.</p>
+          )}
         </Card>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-1">
@@ -90,7 +96,7 @@ export function FinanceExpensesPage() {
               </div>
               <div className="rounded-lg border border-line bg-white/[0.02] p-2.5">
                 <p className="text-[9px] uppercase tracking-[0.1em] text-text-muted">Hari tersisa</p>
-                <p className="num mt-1 text-[13px] text-text-primary">12 hari</p>
+                <p className="num mt-1 text-[13px] text-text-primary">{daysLeft} hari</p>
               </div>
             </div>
           </Card>
@@ -98,7 +104,7 @@ export function FinanceExpensesPage() {
           <Card className="p-5">
             <SectionHeader title="Pengeluaran tidak biasa" description="Di atas 1.6× rata-rata transaksi" />
             {unusual.length === 0 ? (
-              <p className="text-xs text-text-muted">Tidak ada anomali terdeteksi pada data demo.</p>
+              <p className="text-xs text-text-muted">Tidak ada anomali terdeteksi pada transaksi tercatat.</p>
             ) : (
               <div className="space-y-2">
                 {unusual.slice(0, 4).map((t) => (

@@ -4,7 +4,6 @@ import { PageHeader, SectionHeader } from '@/components/shared/page-header'
 import { Card } from '@/components/ui/card'
 import { AreaTrendChart, BarTrendChart } from '@/components/charts/charts'
 import { PlatformLogo, platformColor } from '@/features/content/components/content-ui'
-import { contentAnalytics, platformAccounts } from '@/data/mock'
 import { useContentStore } from '@/stores/content-store'
 import { formatDate, formatNumber, formatPercent } from '@/lib/utils'
 import { cn } from '@/lib/utils'
@@ -127,6 +126,8 @@ function AccountFilter({
 }
 
 export function ContentAnalyticsHubPage() {
+  const platformAccounts = useContentStore((s) => s.accounts)
+  const storeTrend = useContentStore((s) => s.trend)
   const linkedAccounts = useContentStore((s) => s.linkedAccounts)
   const isLinked = (id: string) => linkedAccounts[id] !== false
   const [scope, setScope] = React.useState<Scope>('all')
@@ -146,7 +147,11 @@ export function ContentAnalyticsHubPage() {
 
   const totalAllViews = platformStats.reduce((t, s) => t + s.views, 0)
   const needsChannel = scope !== 'all' && !selected
-  const trendData = contentAnalytics.map((d) => {
+  const baseTrend = storeTrend.long.map((point, index) => ({
+    label: point.label,
+    views: point.views + (storeTrend.short[index]?.views ?? 0),
+  }))
+  const trendData = baseTrend.map((d) => {
     if (selected) {
       const platformTotal = platformStats.find((s) => s.platform === selected.platform)?.views || 1
       const factor = selected.views30d / platformTotal

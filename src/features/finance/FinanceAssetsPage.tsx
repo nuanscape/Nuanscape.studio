@@ -54,26 +54,32 @@ export function FinanceAssetsPage() {
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Net worth" value={formatIDR(summary.netWorth)} delta={6.8} deltaLabel="vs awal bulan" icon={<TrendingUp />} accent="yellow" />
+        <MetricCard label="Net worth" value={formatIDR(summary.netWorth)} deltaLabel="aset dikurangi liabilitas" icon={<TrendingUp />} accent="yellow" />
         <MetricCard label="Total aset" value={formatIDR(summary.assetTotal)} deltaLabel={`${assets.length} pos aset`} icon={<Landmark />} accent="teal" />
         <MetricCard label="Total liabilitas" value={formatIDR(summary.liabilityTotal)} deltaLabel={`${liabilities.length} kewajiban`} icon={<Scale />} tone="warning" accent="orange" />
-        <MetricCard label="Aset likuid" value={formatIDR(liquidity)} deltaLabel={`${((liquidity / summary.assetTotal) * 100).toFixed(0)}% dari aset`} icon={<Wallet />} tone="positive" accent="pink" />
+        <MetricCard label="Aset likuid" value={formatIDR(liquidity)} deltaLabel={summary.assetTotal ? `${((liquidity / summary.assetTotal) * 100).toFixed(0)}% dari aset` : 'belum ada aset'} icon={<Wallet />} tone="positive" accent="pink" />
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1fr_1.6fr]">
         <Card className="p-5">
           <SectionHeader title="Alokasi aset" description="Berdasarkan tipe" />
-          <DonutChart data={allocation} height={200} centerValue={formatIDR(summary.assetTotal, { compact: true })} centerLabel="total aset" />
-          <div className="mt-4 space-y-2">
-            {allocation.map((a) => (
-              <div key={a.name} className="flex items-center gap-2 text-[11px]">
-                <span className="size-2 rounded-full" style={{ backgroundColor: a.color }} />
-                <span className="flex-1 text-text-secondary">{a.name}</span>
-                <span className="num text-text-muted">{formatIDR(a.value, { compact: true })}</span>
-                <span className="num w-10 text-right text-text-primary">{((a.value / summary.assetTotal) * 100).toFixed(0)}%</span>
+          {allocation.length > 0 ? (
+            <>
+              <DonutChart data={allocation} height={200} centerValue={formatIDR(summary.assetTotal, { compact: true })} centerLabel="total aset" />
+              <div className="mt-4 space-y-2">
+                {allocation.map((a) => (
+                  <div key={a.name} className="flex items-center gap-2 text-[11px]">
+                    <span className="size-2 rounded-full" style={{ backgroundColor: a.color }} />
+                    <span className="flex-1 text-text-secondary">{a.name}</span>
+                    <span className="num text-text-muted">{formatIDR(a.value, { compact: true })}</span>
+                    <span className="num w-10 text-right text-text-primary">{(summary.assetTotal ? (a.value / summary.assetTotal) * 100 : 0).toFixed(0)}%</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          ) : (
+            <p className="py-16 text-center text-[11px] text-text-muted">Belum ada aset tercatat.</p>
+          )}
           <div className="mt-4 rounded-lg border border-line bg-white/[0.02] p-3">
             <div className="flex items-center justify-between text-[10px]">
               <span className="text-text-muted">Debt to asset ratio</span>
@@ -106,10 +112,13 @@ export function FinanceAssetsPage() {
                 </div>
                 <div className="text-right">
                   <p className="num text-[12px] text-text-primary">{formatIDR(asset.value)}</p>
-                  <p className="text-[9px] text-text-muted">{((asset.value / summary.assetTotal) * 100).toFixed(1)}% dari aset</p>
+                  <p className="text-[9px] text-text-muted">{(summary.assetTotal ? (asset.value / summary.assetTotal) * 100 : 0).toFixed(1)}% dari aset</p>
                 </div>
               </div>
             ))}
+            {assets.length === 0 ? (
+              <p className="px-5 py-8 text-[11px] text-text-muted">Belum ada aset tercatat.</p>
+            ) : null}
           </div>
         </Card>
       </div>

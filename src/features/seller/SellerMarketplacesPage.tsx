@@ -9,7 +9,7 @@ import { DonutChart } from '@/components/charts/charts'
 import { AccountScope } from '@/features/seller/components/account-scope'
 import { MAX_MARKETPLACE_ACCOUNTS, useSellerStore } from '@/stores/seller-store'
 import { useToastStore } from '@/stores/app-store'
-import { marketplaces } from '@/data/mock'
+import { api } from '@/lib/api-client'
 import { cn, formatDate, formatIDR, formatRelative } from '@/lib/utils'
 import type { MarketplaceConnection } from '@/types'
 
@@ -28,7 +28,7 @@ const statusMeta: Record<MarketplaceConnection['status'], { label: string; tone:
 }
 
 export function SellerMarketplacesPage() {
-  const { connections, activeAccountId, setActiveAccount, syncMarketplace, connectMarketplace, disconnectMarketplace } = useSellerStore()
+  const { connections, orders, activeAccountId, setActiveAccount, syncMarketplace, connectMarketplace, disconnectMarketplace } = useSellerStore()
   const { push } = useToastStore()
   const [syncing, setSyncing] = React.useState<string | null>(null)
 
@@ -39,18 +39,23 @@ export function SellerMarketplacesPage() {
     setSyncing(null)
     push({
       title: `${account.storeName} tersinkron`,
-      description: 'Data produk, pesanan, dan inventory diperbarui (demo).',
+      description: 'Data produk, pesanan, dan inventory diperbarui.',
       tone: 'success',
     })
   }
 
   const syncAll = async () => {
+    setSyncing('all')
+    try {
+      await api.seller.syncAllMarketplaces()
+    } catch {
+      // backend offline: fall back to per-account local sync
+    }
     for (const c of connections.filter((c) => c.status === 'connected')) {
-      setSyncing(c.id)
       await syncMarketplace(c.id)
     }
     setSyncing(null)
-    push({ title: 'Semua akun tersinkron', description: 'Data demo diperbarui.', tone: 'success' })
+    push({ title: 'Semua akun tersinkron', description: 'Data marketplace diperbarui.', tone: 'success' })
   }
 
   const connect = (account: MarketplaceConnection) => {
@@ -79,6 +84,26 @@ export function SellerMarketplacesPage() {
   const latestSync = [...connections]
     .map((c) => c.lastSync)
     .sort((a, b) => +new Date(b) - +new Date(a))[0]
+
+  const platformStats = React.useMemo(() => {
+    const settled = orders.filter((o) => o.status === 'Completed' || o.status === 'Shipped')
+    const settledRevenue = settled.reduce((a, o) => a + o.total, 0)
+    return platforms
+      .map((platform) => {
+        const platformOrders = orders.filter((o) => o.marketplace === platform)
+        const revenue = settled
+          .filter((o) => o.marketplace === platform)
+          .reduce((a, o) => a + o.total, 0)
+        return {
+          name: platform,
+          revenue,
+          orders: platformOrders.length,
+          share: settledRevenue > 0 ? (revenue / settledRevenue) * 100 : 0,
+          color: platformMeta[platform].color,
+        }
+      })
+      .filter((m) => m.orders > 0)
+  }, [orders])
 
   return (
     <div>
@@ -207,7 +232,7 @@ actions={
                 })}
               </div>
               <p className="mt-3 text-[10px] text-text-muted">
-                Maksimal {MAX_MARKETPLACE_ACCOUNTS} akun per platform. Lepas tautan tidak menghapus riwayat pesanan (demo).
+                Maksimal {MAX_MARKETPLACE_ACCOUNTS} akun per platform. Memutus tautan tidak menghapus riwayat pesanan.
               </p>
             </Card>
           )
@@ -229,7 +254,7 @@ actions={
                 </tr>
               </thead>
               <tbody>
-                {marketplaces.map((m) => {
+                {platformStats.map((m) => {
                   const accounts = connections.filter((c) => c.name === m.name)
                   const linked = accounts.filter((c) => c.status === 'connected').length
                   return (
@@ -248,12 +273,19 @@ actions={
                       <td className="py-2.5 pl-3 text-right">
                         <div className="flex items-center justify-end gap-2">
                           <Progress value={m.share} size="sm" className="w-16" />
-                          <span className="num w-8 text-[10px] text-text-muted">{m.share}%</span>
+                          <span className="num w-8 text-[10px] text-text-muted">{Math.round(m.share)}%</span>
                         </div>
                       </td>
                     </tr>
                   )
                 })}
+                {platformStats.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-6 text-center text-[11px] text-text-muted">
+                      Belum ada pesanan tersinkron.
+                    </td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </div>
@@ -261,21 +293,27 @@ actions={
 
         <Card className="p-5">
           <SectionHeader title="Revenue share" description="Dominasi kanal penjualan" />
-          <DonutChart
-            data={marketplaces.map((m) => ({ name: m.name, value: m.revenue, color: m.color }))}
-            height={180}
-            centerValue={formatIDR(marketplaces.reduce((a, m) => a + m.revenue, 0), { compact: true })}
-            centerLabel="total revenue"
-          />
-          <div className="mt-3 space-y-2">
-            {marketplaces.map((m) => (
-              <div key={m.name} className="flex items-center gap-2 text-[10px]">
-                <span className="size-2 rounded-full" style={{ backgroundColor: m.color }} />
-                <span className="flex-1 text-text-secondary">{m.name}</span>
-                <span className="num text-text-muted">{m.share}%</span>
+          {platformStats.length > 0 ? (
+            <>
+              <DonutChart
+                data={platformStats.map((m) => ({ name: m.name, value: m.revenue, color: m.color }))}
+                height={180}
+                centerValue={formatIDR(platformStats.reduce((a, m) => a + m.revenue, 0), { compact: true })}
+                centerLabel="total revenue"
+              />
+              <div className="mt-3 space-y-2">
+                {platformStats.map((m) => (
+                  <div key={m.name} className="flex items-center gap-2 text-[10px]">
+                    <span className="size-2 rounded-full" style={{ backgroundColor: m.color }} />
+                    <span className="flex-1 text-text-secondary">{m.name}</span>
+                    <span className="num text-text-muted">{Math.round(m.share)}%</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          ) : (
+            <p className="py-14 text-center text-[11px] text-text-muted">Belum ada pesanan tersinkron.</p>
+          )}
         </Card>
       </div>
 
@@ -284,8 +322,8 @@ actions={
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {[
             { icon: <ShieldCheck className="size-4 text-primary" />, t: 'Read-only default', d: 'Pesanan dan analitik hanya dibaca. Aksi tulis memerlukan konfirmasi.' },
-            { icon: <RefreshCw className="size-4 text-primary" />, t: 'Sinkronisasi manual', d: 'Tidak ada perubahan otomatis ke marketplace pada demo ini.' },
-            { icon: <AlertCircle className="size-4 text-primary" />, t: 'Audit trail', d: 'Setiap aksi demo ditampilkan sebagai notifikasi dan tidak dikirim ke marketplace.' },
+            { icon: <RefreshCw className="size-4 text-primary" />, t: 'Sinkronisasi manual', d: 'Perubahan ke marketplace hanya terjadi saat sinkronisasi dijalankan.' },
+            { icon: <AlertCircle className="size-4 text-primary" />, t: 'Audit trail', d: 'Setiap aksi ditampilkan sebagai notifikasi dan tercatat di aplikasi.' },
           ].map((x) => (
             <div key={x.t} className="rounded-xl border border-line bg-white/[0.02] p-3.5">
               <div className="flex items-center gap-2">{x.icon}<p className="text-[11px] font-medium text-text-primary">{x.t}</p></div>
@@ -294,7 +332,7 @@ actions={
           ))}
         </div>
         <p className="mt-3 text-[10px] text-text-muted">
-          Sync terakhir: {latestSync ? formatDate(latestSync) : '—'}. Semua data adalah simulasi lokal.
+          Sync terakhir: {latestSync ? formatDate(latestSync) : '—'}. Data tersinkron dengan backend Nuanscape.
         </p>
       </Card>
     </div>

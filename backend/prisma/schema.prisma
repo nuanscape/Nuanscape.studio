@@ -1,0 +1,833 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Platform {
+  YouTube
+  TikTok
+  Instagram
+}
+
+enum ContentFormat {
+  long
+  short
+}
+
+enum AccountStatus {
+  Active
+  Growing
+  Paused
+}
+
+enum ContentAssetType {
+  Video
+  Image
+  Thumbnail
+  Script
+  Caption
+}
+
+enum TransactionType {
+  income
+  expense
+}
+
+enum TransactionAccount {
+  Personal
+  Business
+  Marketplace
+}
+
+enum RecurringInterval {
+  none
+  monthly
+  weekly
+}
+
+enum AssetType {
+  Cash
+  Bank
+  Investment
+  Business
+  Inventory
+}
+
+enum LiabilityType {
+  Debt
+  Obligation
+}
+
+enum MarketplaceName {
+  TikTokShop
+  Shopee
+}
+
+enum ProductMarketplace {
+  TikTokShop
+  Shopee
+  Both
+}
+
+enum ProductStatus {
+  Active
+  Paused
+  OutOfStock
+}
+
+enum OrderStatus {
+  Pending
+  Processing
+  Shipped
+  Completed
+  Cancelled
+  Returned
+}
+
+enum StockMovementType {
+  In
+  Out
+  Damaged
+  Reserved
+}
+
+enum ConnectionStatus {
+  connected
+  disconnected
+  syncing
+  error
+}
+
+enum PromoStatus {
+  active
+  paused
+  scheduled
+  ended
+}
+
+enum VoucherKind {
+  percent
+  fixed
+  shipping
+}
+
+enum LedgerType {
+  income
+  discount
+  refund
+  platform_fee
+  affiliate_fee
+  shipping
+  cogs
+  ads
+  opex
+}
+
+/// Fondasi M1 (Auth & Profil). Field akan dilengkapi di milestone berikutnya.
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  passwordHash String
+  googleId     String?   @unique
+  role         String    @default("Owner")
+  plan         String    @default("Studio")
+  timezone     String    @default("Asia/Jakarta")
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  contentAccounts PlatformAccount[]
+  contentItems    ContentItem[]
+  contentIdeas    ContentIdea[]
+  contentEnergy   ContentEnergy?
+  libraryAssets   LibraryAsset[]
+  sessions        AuthSession[]
+  preferences     UserPreference?
+
+  financeTransactions FinanceTransaction[]
+  financeBudgets      FinanceBudget[]
+  financeGoals        FinanceGoal[]
+  financeAssets       FinanceAsset[]
+  financeLiabilities  FinanceLiability[]
+  financeSnapshots    FinanceMonthlySnapshot[]
+
+  sellerSetting        SellerSetting?
+  sellerProducts       Product[]
+  sellerMovements      InventoryMovement[]
+  sellerOrders         Order[]
+  sellerConnections    MarketplaceConnection[]
+  sellerDailySnapshots SellerDailySnapshot[]
+  sellerVouchers       SellerVoucher[]
+  sellerFlashSales     SellerFlashSale[]
+  sellerAdCampaigns    SellerAdCampaign[]
+  sellerLedgerEntries  SellerLedgerEntry[]
+
+  automations     Automation[]
+  automationRuns  AutomationRun[]
+  notifications   AppNotification[]
+  briefingReports BriefingReport[]
+  headAgentConfig HeadAgentConfig?
+  aiProviderConfigs AiProviderConfig[]
+
+  @@map("users")
+}
+
+model AuthSession {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  userAgent  String?
+  ip         String?
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  lastUsedAt DateTime  @default(now())
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("auth_sessions")
+}
+
+model UserPreference {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  currency      String   @default("IDR")
+  language      String   @default("Bahasa Indonesia")
+  weekStart     String   @default("Senin")
+  compact       Boolean  @default(true)
+  notifyDaily   Boolean  @default(true)
+  notifyStock   Boolean  @default(true)
+  notifyBudget  Boolean  @default(true)
+  notifyContent Boolean  @default(false)
+  notifyEmail   Boolean  @default(false)
+  aiTone        String   @default("Ringkas dan langsung")
+  aiCitations   Boolean  @default(true)
+  aiEstimates   Boolean  @default(true)
+  aiApproval    Boolean  @default(true)
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model PlatformAccount {
+  id                String        @id
+  ownerId           String
+  platform          Platform
+  format            ContentFormat
+  name              String
+  handle            String
+  niche             String
+  followers         Int
+  posts30d          Int
+  views30d          Int
+  engagement        Float
+  avgWatchMinutes   Float
+  completionRate    Float
+  status            AccountStatus
+  lastSync          DateTime
+  externalId        String?
+  oauthRefreshToken String?
+  oauthScopes       String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  owner         User           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  items         ContentItem[]
+  ideas         ContentIdea[]
+  libraryAssets LibraryAsset[]
+
+  @@index([ownerId, format])
+  @@index([ownerId, platform])
+  @@map("platform_accounts")
+}
+
+model ContentItem {
+  id             String   @id @default(cuid())
+  ownerId        String
+  title          String
+  platform       Platform
+  accountId      String?
+  niche          String
+  format         String
+  status         String
+  scheduledAt    DateTime
+  views          Int      @default(0)
+  engagement     Float    @default(0)
+  script         String?
+  thumbnail      String?
+  caption        String?
+  hashtags       String[] @default([])
+  previewUrl     String?
+  videoUrl       String?
+  thumbnailStyle String?
+  animationStyle String?
+  musicStyle     String?
+  generated      Boolean  @default(false)
+  sourceIdeaId   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  owner         User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  account       PlatformAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  libraryAssets LibraryAsset[]
+
+  @@index([ownerId, platform, status])
+  @@index([ownerId, accountId])
+  @@index([ownerId, scheduledAt])
+  @@map("content_items")
+}
+
+model ContentIdea {
+  id        String   @id @default(cuid())
+  ownerId   String
+  title     String
+  hook      String
+  platform  Platform
+  accountId String?
+  niche     String
+  angle     String
+  format    String
+  score     Int
+  thumbnail String?
+  reference String?
+  status    String   @default("draft")
+  approved  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner   User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  account PlatformAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId, platform, approved])
+  @@index([ownerId, accountId])
+  @@map("content_ideas")
+}
+
+model ContentEnergy {
+  id             String   @id @default(cuid())
+  ownerId        String   @unique
+  current        Int      @default(100)
+  max            Int      @default(100)
+  lastRechargeAt DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@map("content_energy")
+}
+
+model LibraryAsset {
+  id        String           @id @default(cuid())
+  ownerId   String
+  name      String
+  type      ContentAssetType
+  platform  Platform
+  accountId String?
+  size      String
+  createdAt DateTime         @default(now())
+  contentId String?
+
+  owner   User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  account PlatformAccount? @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  content ContentItem?     @relation(fields: [contentId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId, type])
+  @@index([ownerId, accountId])
+  @@index([ownerId, contentId])
+  @@map("library_assets")
+}
+
+model FinanceTransaction {
+  id          String             @id @default(cuid())
+  ownerId     String
+  type        TransactionType
+  category    String
+  description String
+  amount      Int
+  date        DateTime           @db.Date
+  account     TransactionAccount
+  recurring   RecurringInterval  @default(none)
+  source      String?
+  note        String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, date])
+  @@index([ownerId, type, category])
+  @@index([ownerId, account])
+  @@map("finance_transactions")
+}
+
+model FinanceBudget {
+  id          String   @id @default(cuid())
+  ownerId     String
+  category    String
+  limitAmount Int      @map("limit_amount")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, category])
+  @@map("finance_budgets")
+}
+
+model FinanceGoal {
+  id        String   @id @default(cuid())
+  ownerId   String
+  name      String
+  target    Int
+  saved     Int      @default(0)
+  deadline  DateTime @db.Date
+  color     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, deadline])
+  @@map("finance_goals")
+}
+
+model FinanceAsset {
+  id        String    @id @default(cuid())
+  ownerId   String
+  name      String
+  type      AssetType
+  value     Int
+  note      String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, type])
+  @@map("finance_assets")
+}
+
+model FinanceLiability {
+  id        String        @id @default(cuid())
+  ownerId   String
+  name      String
+  type      LiabilityType
+  value     Int
+  dueDate   DateTime      @db.Date
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, dueDate])
+  @@map("finance_liabilities")
+}
+
+/// Snapshot bulanan historis untuk laporan. Bulan yang punya transaksi
+/// dihitung ulang dari transaksi aktual; snapshot dipakai untuk bulan kosong.
+model FinanceMonthlySnapshot {
+  id      String   @id @default(cuid())
+  ownerId String
+  month   DateTime @db.Date
+  income  Int
+  expense Int
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, month])
+  @@map("finance_monthly_snapshots")
+}
+
+/// Konfigurasi fee dan baseline performa 30 hari milik satu toko.
+/// Order yang dibuat lewat API (includedInBaseline=false) ditambahkan
+/// sebagai delta di atas baseline agar data demo tetap konsisten.
+model SellerSetting {
+  id      String @id @default(cuid())
+  ownerId String @unique
+
+  marketplacePct   Float @default(7)
+  affiliatePct     Float @default(2)
+  shippingPerOrder Int   @default(12500)
+  adsMonthly       Int   @default(3750000)
+  opexMonthly      Int   @default(2400000)
+
+  grossRevenue30d Int @default(0)
+  cogs30d         Int @default(0)
+  discounts30d    Int @default(0)
+  refunds30d      Int @default(0)
+  orderCount30d   Int @default(0)
+
+  tiktokRevenue30d Int @default(0)
+  shopeeRevenue30d Int @default(0)
+  tiktokOrders30d  Int @default(0)
+  shopeeOrders30d  Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@map("seller_settings")
+}
+
+model Product {
+  id          String             @id @default(cuid())
+  ownerId     String
+  sku         String
+  name        String
+  category    String
+  price       Int
+  cost        Int
+  stock       Int                @default(0)
+  minStock    Int                @default(0)
+  sold        Int                @default(0)
+  marketplace ProductMarketplace @default(Both)
+  accountIds  String[]           @default([])
+  discountPct Int                @default(0)
+  seoScore    Int                @default(0)
+  geoScore    Int                @default(0)
+  status      ProductStatus      @default(Active)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  owner         User                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  movements     InventoryMovement[]
+  orders        Order[]
+  flashSales    SellerFlashSale[]
+  ledgerEntries SellerLedgerEntry[]
+
+  @@unique([ownerId, sku])
+  @@index([ownerId, status])
+  @@index([ownerId, marketplace])
+  @@index([ownerId, category])
+  @@map("seller_products")
+}
+
+model InventoryMovement {
+  id        String            @id @default(cuid())
+  ownerId   String
+  productId String
+  type      StockMovementType
+  qty       Int
+  note      String
+  date      DateTime          @default(now())
+  createdAt DateTime          @default(now())
+
+  owner   User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, date])
+  @@index([ownerId, productId])
+  @@map("seller_inventory_movements")
+}
+
+model Order {
+  id          String          @id
+  ownerId     String
+  productId   String?
+  productName String
+  customer    String
+  qty         Int
+  total       Int
+  unitCost    Int             @default(0)
+  status      OrderStatus     @default(Pending)
+  marketplace MarketplaceName
+  accountId   String          @default("all")
+  date        DateTime        @default(now())
+
+  /// Seed order lama dihitung dalam baseline 30 hari; order API menjadi delta.
+  includedInBaseline Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner   User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId, date])
+  @@index([ownerId, status])
+  @@index([ownerId, marketplace])
+  @@index([ownerId, accountId])
+  @@map("seller_orders")
+}
+
+model MarketplaceConnection {
+  id          String           @id @default(cuid())
+  ownerId     String
+  name        MarketplaceName
+  storeName   String
+  status      ConnectionStatus @default(connected)
+  lastSync    DateTime?
+  permissions String[]         @default([])
+  note        String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, name])
+  @@map("seller_marketplace_connections")
+}
+
+/// Revenue harian baseline untuk grafik 7 hari; order API ditambahkan per tanggal.
+model SellerDailySnapshot {
+  id      String   @id @default(cuid())
+  ownerId String
+  date    DateTime @db.Date
+  tiktok  Int
+  shopee  Int
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, date])
+  @@map("seller_daily_snapshots")
+}
+
+model SellerVoucher {
+  id          String          @id @default(cuid())
+  ownerId     String
+  code        String
+  title       String
+  accountId   String          @default("all")
+  marketplace MarketplaceName
+  kind        VoucherKind
+  value       Int
+  minSpend    Int             @default(0)
+  quota       Int             @default(0)
+  used        Int             @default(0)
+  startDate   DateTime        @db.Date
+  endDate     DateTime        @db.Date
+  status      PromoStatus     @default(active)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, code])
+  @@index([ownerId, status])
+  @@index([ownerId, accountId])
+  @@map("seller_vouchers")
+}
+
+model SellerFlashSale {
+  id          String          @id @default(cuid())
+  ownerId     String
+  title       String
+  accountId   String          @default("all")
+  marketplace MarketplaceName
+  productId   String?
+  discountPct Int
+  quota       Int
+  sold        Int             @default(0)
+  startDate   DateTime        @db.Date
+  endDate     DateTime        @db.Date
+  status      PromoStatus     @default(active)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  owner   User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId, status])
+  @@index([ownerId, accountId])
+  @@map("seller_flash_sales")
+}
+
+model SellerAdCampaign {
+  id          String          @id @default(cuid())
+  ownerId     String
+  name        String
+  accountId   String          @default("all")
+  marketplace MarketplaceName
+  objective   String          @default("Sales")
+  budget      Int
+  spend       Int             @default(0)
+  revenue     Int             @default(0)
+  impressions Int             @default(0)
+  clicks      Int             @default(0)
+  conversions Int             @default(0)
+  startDate   DateTime        @db.Date
+  endDate     DateTime        @db.Date
+  status      PromoStatus     @default(active)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, status])
+  @@index([ownerId, accountId])
+  @@map("seller_ad_campaigns")
+}
+
+model SellerLedgerEntry {
+  id          String          @id @default(cuid())
+  ownerId     String
+  date        DateTime        @db.Date
+  accountId   String          @default("all")
+  marketplace MarketplaceName
+  type        LedgerType
+  label       String
+  detail      String?
+  amount      Int
+  productId   String?
+  ref         String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  owner   User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([ownerId, date])
+  @@index([ownerId, type])
+  @@index([ownerId, accountId])
+  @@map("seller_ledger_entries")
+}
+
+enum AutomationModule {
+  Finance
+  Content
+  Shop
+}
+
+enum AutomationStatus {
+  active
+  paused
+  needs_approval
+}
+
+enum NotificationType {
+  finance
+  content
+  shop
+  system
+  ai
+}
+
+model Automation {
+  id          String           @id @default(cuid())
+  ownerId     String
+  name        String
+  module      AutomationModule
+  description String
+  status      AutomationStatus @default(active)
+  trigger     String
+  lastRun     DateTime         @default(now())
+  runs        Int              @default(0)
+  successRate Int              @default(100)
+  steps       String[]         @default([])
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  owner       User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  runsHistory AutomationRun[]
+
+  @@index([ownerId, module])
+  @@index([ownerId, status])
+  @@map("automations")
+}
+
+model AutomationRun {
+  id           String   @id @default(cuid())
+  ownerId      String
+  automationId String
+  status       String   @default("success")
+  summary      String
+  startedAt    DateTime @default(now())
+  finishedAt   DateTime @default(now())
+
+  owner      User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  automation Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, automationId])
+  @@map("automation_runs")
+}
+
+model AppNotification {
+  id        String           @id @default(cuid())
+  ownerId   String
+  title     String
+  message   String
+  type      NotificationType
+  time      DateTime         @default(now())
+  read      Boolean          @default(false)
+  href      String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, read])
+  @@index([ownerId, type])
+  @@map("app_notifications")
+}
+
+model BriefingReport {
+  id         String   @id @default(cuid())
+  ownerId    String
+  title      String
+  period     String   @default("daily")
+  date       DateTime @db.Date
+  content    String
+  sentiment  String   @default("neutral")
+  metrics    Json?
+  highlights String[] @default([])
+  createdAt  DateTime @default(now())
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, date])
+  @@map("briefing_reports")
+}
+
+model HeadAgentConfig {
+  id                String   @id @default(cuid())
+  ownerId           String   @unique
+  primaryProvider   String   @default("kie.ai")
+  fallbackProvider  String   @default("nvidia")
+  primaryModel      String   @default("kimi-k3-1-pro")
+  fallbackModel     String   @default("nvidia/nemotron-3.5-lightning-30b-a3b")
+  autoApproval      Boolean  @default(false)
+  dailyBriefingHour Int      @default(7)
+  weeklyBriefingDay String   @default("Senin")
+  updatedAt         DateTime @updatedAt
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@map("head_agent_configs")
+}
+
+/// Kredensial provider LLM per owner. API key disimpan sebagai ciphertext
+/// AES-256-GCM; plaintext tidak pernah ditulis ke database.
+model AiProviderConfig {
+  id                String   @id @default(cuid())
+  ownerId           String
+  provider          String
+  baseUrl           String
+  model             String
+  encryptedKey      String
+  keyIv             String
+  keyTag            String
+  keyVersion        Int      @default(1)
+  keyHint           String
+  fingerprint       String
+  lastTestedAt      DateTime?
+  lastTestStatus    String?
+  lastTestMessage   String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, provider])
+  @@index([ownerId])
+  @@map("ai_provider_configs")
+}

@@ -1,14 +1,4 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
-import {
-  adCampaigns as seedAds,
-  flashSales as seedFlashSales,
-  inventoryMovements as seedMovements,
-  marketplaceConnections as seedConnections,
-  orders as seedOrders,
-  products as seedProducts,
-  vouchers as seedVouchers,
-} from '@/data/mock'
 import type {
   AdCampaign,
   FlashSale,
@@ -19,6 +9,7 @@ import type {
   Voucher,
 } from '@/types'
 import { uid } from '@/lib/utils'
+import { api, apiFetch } from '@/lib/api-client'
 
 export interface FeeConfig {
   marketplacePct: number
@@ -35,6 +26,7 @@ interface SellerState {
   orders: Order[]
   movements: InventoryMovement[]
   connections: MarketplaceConnection[]
+  connectionsFromBackend: boolean
   vouchers: Voucher[]
   flashSales: FlashSale[]
   ads: AdCampaign[]
@@ -79,26 +71,26 @@ interface SellerState {
   }) => void
   toggleAdCampaign: (id: string) => void
   addAdBudget: (id: string, amount: number) => void
+  refresh: () => Promise<void>
 }
 
-export const useSellerStore = create<SellerState>()(
-  persist(
-    (set, get) => ({
-      products: seedProducts,
-      orders: seedOrders,
-      movements: seedMovements,
-      connections: seedConnections,
-      vouchers: seedVouchers,
-      flashSales: seedFlashSales,
-      ads: seedAds,
+export const useSellerStore = create<SellerState>()((set, get) => ({
+      products: [],
+      orders: [],
+      movements: [],
+      connections: [],
+      connectionsFromBackend: false,
+      vouchers: [],
+      flashSales: [],
+      ads: [],
       activeAccountId: 'all',
       setActiveAccount: (id) => set({ activeAccountId: id }),
       fees: {
-        marketplacePct: 7,
-        affiliatePct: 2,
-        shippingPerOrder: 12500,
-        adsMonthly: 3750000,
-        opexMonthly: 2400000,
+        marketplacePct: 0,
+        affiliatePct: 0,
+        shippingPerOrder: 0,
+        adsMonthly: 0,
+        opexMonthly: 0,
       },
       addProduct: (p) => {
         const accountIds =
@@ -119,13 +111,22 @@ export const useSellerStore = create<SellerState>()(
             ...s.products,
           ],
         }))
+        api.seller.createProduct(p).catch(() => {})
       },
-      updateProduct: (id, patch) =>
+      updateProduct: (id, patch) => {
         set((s) => ({
           products: s.products.map((p) => (p.id === id ? { ...p, ...patch } : p)),
-        })),
-      deleteProduct: (id) => set((s) => ({ products: s.products.filter((p) => p.id !== id) })),
-      restockProduct: (id, qty) =>
+        }))
+        apiFetch(`/seller/products/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(patch),
+        }).catch(() => {})
+      },
+      deleteProduct: (id) => {
+        set((s) => ({ products: s.products.filter((p) => p.id !== id) }))
+        apiFetch(`/seller/products/${id}`, { method: 'DELETE' }).catch(() => {})
+      },
+      restockProduct: (id, qty) => {
         set((s) => {
           const products = s.products.map((p) =>
             p.id === id
@@ -147,9 +148,19 @@ export const useSellerStore = create<SellerState>()(
               ...s.movements,
             ],
           }
-        }),
-      updateOrderStatus: (id, status) =>
-        set((s) => ({ orders: s.orders.map((o) => (o.id === id ? { ...o, status } : o)) })),
+        })
+        apiFetch(`/seller/inventory/${id}/restock`, {
+          method: 'POST',
+          body: JSON.stringify({ qty }),
+        }).catch(() => {})
+      },
+      updateOrderStatus: (id, status) => {
+        set((s) => ({ orders: s.orders.map((o) => (o.id === id ? { ...o, status } : o)) }))
+        apiFetch(`/seller/orders/${id}/status`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status }),
+        }).catch(() => {})
+      },
       connectMarketplace: (id) =>
         set((s) => {
           const target = s.connections.find((c) => c.id === id)
@@ -184,7 +195,7 @@ export const useSellerStore = create<SellerState>()(
         set((s) => ({
           connections: s.connections.map((c) => (c.id === id ? { ...c, status: 'syncing' } : c)),
         }))
-        await new Promise((r) => setTimeout(r, 1300))
+        await new Promise((r) => setTimeout(r, 400))
         set((s) => ({
           connections: s.connections.map((c) =>
             c.id === id
@@ -192,9 +203,25 @@ export const useSellerStore = create<SellerState>()(
               : c,
           ),
         }))
-        void get()
+        if (!get().connectionsFromBackend) return
+        try {
+          const updated = (await api.seller.syncMarketplace(id)) as Partial<MarketplaceConnection>
+          if (updated?.id) {
+            set((s) => ({
+              connections: s.connections.map((c) => (c.id === id ? { ...c, ...updated } : c)),
+            }))
+          }
+        } catch {
+          // offline / demo connection id: keep optimistic state
+        }
       },
-      updateFees: (patch) => set((s) => ({ fees: { ...s.fees, ...patch } })),
+      updateFees: (patch) => {
+        set((s) => ({ fees: { ...s.fees, ...patch } }))
+        apiFetch('/seller/finance/fees', {
+          method: 'PATCH',
+          body: JSON.stringify(patch),
+        }).catch(() => {})
+      },
       addVoucher: (v) => {
         const account = get().connections.find((c) => c.id === v.accountId)
         if (!account) return
@@ -211,15 +238,21 @@ export const useSellerStore = create<SellerState>()(
             ...s.vouchers,
           ],
         }))
+        apiFetch('/seller/vouchers', {
+          method: 'POST',
+          body: JSON.stringify(v),
+        }).catch(() => {})
       },
-      toggleVoucher: (id) =>
+      toggleVoucher: (id) => {
         set((s) => ({
           vouchers: s.vouchers.map((v) =>
             v.id === id && v.status !== 'ended'
               ? { ...v, status: v.status === 'active' ? 'paused' : 'active' }
               : v,
           ),
-        })),
+        }))
+        apiFetch(`/seller/vouchers/${id}/toggle`, { method: 'POST' }).catch(() => {})
+      },
       addFlashSale: (f) => {
         const account = get().connections.find((c) => c.id === f.accountId)
         if (!account) return
@@ -236,15 +269,21 @@ export const useSellerStore = create<SellerState>()(
             ...s.flashSales,
           ],
         }))
+        apiFetch('/seller/flash-sales', {
+          method: 'POST',
+          body: JSON.stringify(f),
+        }).catch(() => {})
       },
-      toggleFlashSale: (id) =>
+      toggleFlashSale: (id) => {
         set((s) => ({
           flashSales: s.flashSales.map((f) =>
             f.id === id && f.status !== 'ended'
               ? { ...f, status: f.status === 'active' ? 'paused' : 'active' }
               : f,
           ),
-        })),
+        }))
+        apiFetch(`/seller/flash-sales/${id}/toggle`, { method: 'POST' }).catch(() => {})
+      },
       addAdCampaign: (a) => {
         const account = get().connections.find((c) => c.id === a.accountId)
         if (!account) return
@@ -265,32 +304,58 @@ export const useSellerStore = create<SellerState>()(
             ...s.ads,
           ],
         }))
+        apiFetch('/seller/ad-campaigns', {
+          method: 'POST',
+          body: JSON.stringify(a),
+        }).catch(() => {})
       },
-      toggleAdCampaign: (id) =>
+      toggleAdCampaign: (id) => {
         set((s) => ({
           ads: s.ads.map((a) =>
             a.id === id && a.status !== 'ended'
               ? { ...a, status: a.status === 'active' ? 'paused' : 'active' }
               : a,
           ),
-        })),
-      addAdBudget: (id, amount) =>
+        }))
+        apiFetch(`/seller/ad-campaigns/${id}/toggle`, { method: 'POST' }).catch(() => {})
+      },
+      addAdBudget: (id, amount) => {
         set((s) => ({
           ads: s.ads.map((a) => (a.id === id ? { ...a, budget: a.budget + amount } : a)),
-        })),
-    }),
-    {
-      name: 'nuanscape-seller-v4',
-      partialize: (s) => ({
-        products: s.products,
-        orders: s.orders,
-        movements: s.movements,
-        connections: s.connections,
-        vouchers: s.vouchers,
-        flashSales: s.flashSales,
-        ads: s.ads,
-        fees: s.fees,
-      }),
-    },
-  ),
-)
+        }))
+        apiFetch(`/seller/ad-campaigns/${id}/budget`, {
+          method: 'POST',
+          body: JSON.stringify({ amount }),
+        }).catch(() => {})
+      },
+      refresh: async () => {
+        try {
+          const [productsRes, ordersRes, marketsRes, vouchersRes, flashRes, adsRes, financeRes] =
+            await Promise.all([
+              api.seller.listProducts(),
+              api.seller.listOrders({ limit: '200' }),
+              api.seller.listMarketplaces(),
+              api.seller.listVouchers(),
+              api.seller.listFlashSales(),
+              api.seller.listAdCampaigns(),
+              api.seller.getFinance(),
+            ])
+          const connections = (marketsRes.items as MarketplaceConnection[]).map((c) => ({
+            ...c,
+            lastSync: c.lastSync ?? '',
+          }))
+          set({
+            products: productsRes.items as Product[],
+            orders: ordersRes.items as Order[],
+            connections,
+            connectionsFromBackend: true,
+            vouchers: Array.isArray(vouchersRes) ? (vouchersRes as Voucher[]) : [],
+            flashSales: Array.isArray(flashRes) ? (flashRes as FlashSale[]) : [],
+            ads: Array.isArray(adsRes) ? (adsRes as AdCampaign[]) : [],
+            ...(financeRes?.fees ? { fees: financeRes.fees as FeeConfig } : {}),
+          })
+        } catch {
+          // backend tidak tersedia: biarkan state kosong
+        }
+      },
+}))

@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress'
 import { BudgetModal } from '@/features/finance/components/budget-modal'
 import { useFinanceStore } from '@/stores/finance-store'
 import { budgetSummary } from '@/lib/metrics'
-import { financeInsights } from '@/data/mock'
+import type { AIInsight } from '@/types'
 import { cn, formatIDR } from '@/lib/utils'
 
 export function FinanceBudgetsPage() {
@@ -18,6 +18,30 @@ export function FinanceBudgetsPage() {
   const summary = budgetSummary(budgets)
   const editingBudget = budgets.find((b) => b.id === editing)
   const over = budgets.filter((b) => b.spent > b.limit)
+  const usageOf = (b: { limit: number; spent: number }) => (b.limit ? (b.spent / b.limit) * 100 : 0)
+  const highest = [...budgets].sort((a, b) => usageOf(b) - usageOf(a))[0]
+  const insights: AIInsight[] = []
+  if (highest) {
+    const usage = usageOf(highest)
+    insights.push({
+      id: 'budget-usage',
+      title: `Budget ${highest.category} terpakai ${Math.round(usage)}%`,
+      detail: `${formatIDR(highest.spent, { compact: true })} dari limit ${formatIDR(highest.limit, { compact: true })}.`,
+      why: 'Dihitung dari data budget dan pemakaian yang tersimpan.',
+      tone: usage > 100 ? 'danger' : usage > 85 ? 'warning' : 'neutral',
+      action: 'Sesuaikan limit',
+    })
+  }
+  if (over.length > 0) {
+    insights.push({
+      id: 'budget-over',
+      title: `${over.length} budget melewati limit`,
+      detail: over.map((b) => b.category).join(', '),
+      why: 'Daftar kategori dengan pemakaian di atas limit saat ini.',
+      tone: 'warning',
+      action: 'Tinjau kategori',
+    })
+  }
 
   return (
     <div>
@@ -46,7 +70,7 @@ export function FinanceBudgetsPage() {
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.8fr_1fr]">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {budgets.map((budget) => {
-            const usage = (budget.spent / budget.limit) * 100
+            const usage = usageOf(budget)
             const remaining = budget.limit - budget.spent
             const tone = usage > 100 ? 'danger' : usage > 85 ? 'warning' : 'primary'
             return (
@@ -109,19 +133,22 @@ export function FinanceBudgetsPage() {
             <SectionHeader title="Ringkasan pemakaian" description="Perbandingan limit dan realisasi" />
             <div className="space-y-3">
               {[...budgets]
-                .sort((a, b) => b.spent / b.limit - a.spent / a.limit)
+                .sort((a, b) => usageOf(b) - usageOf(a))
                 .slice(0, 6)
                 .map((b) => (
                   <div key={b.id}>
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="text-text-secondary">{b.category}</span>
                       <span className={cn('num', b.spent > b.limit ? 'text-danger' : 'text-text-primary')}>
-                        {Math.round((b.spent / b.limit) * 100)}%
+                        {Math.round(usageOf(b))}%
                       </span>
                     </div>
-                    <Progress value={(b.spent / b.limit) * 100} size="sm" tone={b.spent > b.limit ? 'danger' : b.spent / b.limit > 0.85 ? 'warning' : 'primary'} className="mt-1.5" />
+                    <Progress value={usageOf(b)} size="sm" tone={b.spent > b.limit ? 'danger' : usageOf(b) > 85 ? 'warning' : 'primary'} className="mt-1.5" />
                   </div>
                 ))}
+              {budgets.length === 0 ? (
+                <p className="py-6 text-center text-[11px] text-text-muted">Belum ada budget.</p>
+              ) : null}
             </div>
           </Card>
           <Card className="p-5">
@@ -131,9 +158,14 @@ export function FinanceBudgetsPage() {
               action={<button onClick={() => window.location.assign('/app/monitor')} className="text-[10px] text-primary">Buka AI</button>}
             />
             <div className="space-y-3">
-              {financeInsights.slice(0, 2).map((insight) => (
+              {insights.map((insight) => (
                 <InsightCard key={insight.id} {...insight} onAction={() => window.location.assign('/app/monitor')} />
               ))}
+              {insights.length === 0 ? (
+                <p className="py-6 text-center text-[11px] text-text-muted">
+                  Belum ada budget untuk dianalisis.
+                </p>
+              ) : null}
             </div>
             <div className="mt-3 flex items-center gap-2 rounded-lg border border-line bg-white/[0.02] p-2.5">
               <span className="text-[10px] leading-relaxed text-text-muted">

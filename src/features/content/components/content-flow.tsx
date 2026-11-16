@@ -13,7 +13,6 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { platformAccounts } from '@/data/mock'
 import { useContentStore } from '@/stores/content-store'
 import type {
   ContentFormat,
@@ -120,9 +119,10 @@ export function formatBasePath(format: ContentFormat): string {
 }
 
 export function resolveAccount(row: { platform: Platform; accountId?: string }): PlatformAccount | undefined {
-  const direct = row.accountId ? platformAccounts.find((account) => account.id === row.accountId) : undefined
+  const accounts = useContentStore.getState().accounts
+  const direct = row.accountId ? accounts.find((account) => account.id === row.accountId) : undefined
   if (direct) return direct
-  return platformAccounts.find((account) => account.platform === row.platform)
+  return accounts.find((account) => account.platform === row.platform)
 }
 
 export function resolveFormat(row: { platform: Platform; accountId?: string }): ContentFormat {
@@ -130,11 +130,11 @@ export function resolveFormat(row: { platform: Platform; accountId?: string }): 
 }
 
 export function accountsForFormat(format: ContentFormat): PlatformAccount[] {
-  return platformAccounts.filter((account) => account.format === format)
+  return useContentStore.getState().accounts.filter((account) => account.format === format)
 }
 
 export function defaultAccountForPlatform(platform: Platform): string | undefined {
-  return platformAccounts.find((account) => account.platform === platform)?.id
+  return useContentStore.getState().accounts.find((account) => account.platform === platform)?.id
 }
 
 const ContentFormatContext = React.createContext<ContentFormat>('long')
@@ -175,7 +175,11 @@ export function useContentScope(): ContentScope {
   const items = useContentStore((s) => s.items)
   const ideas = useContentStore((s) => s.ideas)
   const library = useContentStore((s) => s.library)
-  const accounts = React.useMemo(() => accountsForFormat(format), [format])
+  const storeAccounts = useContentStore((s) => s.accounts)
+  const accounts = React.useMemo(
+    () => storeAccounts.filter((account) => account.format === format),
+    [storeAccounts, format],
+  )
   const requested = params.get('account')
   const accountId = requested && accounts.some((account) => account.id === requested) ? requested : null
   const account = accountId ? accounts.find((account) => account.id === accountId) ?? null : null
@@ -294,7 +298,11 @@ export function ContentFormatLayout() {
   const meta = contentFormats[format]
   const basePath = formatBasePath(format)
   const [params] = useSearchParams()
-  const accounts = accountsForFormat(format)
+  const storeAccounts = useContentStore((s) => s.accounts)
+  const accounts = React.useMemo(
+    () => storeAccounts.filter((account) => account.format === format),
+    [storeAccounts, format],
+  )
   const requested = params.get('account')
   const accountId = requested && accounts.some((account) => account.id === requested) ? requested : null
 

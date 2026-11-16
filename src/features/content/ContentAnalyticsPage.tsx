@@ -1,16 +1,17 @@
 import * as React from 'react'
 import { BarChart3, Clock3, Eye, Heart, Sparkles } from 'lucide-react'
-import { PageHeader, MetricCard, SectionHeader, InsightCard } from '@/components/shared/page-header'
+import { PageHeader, MetricCard, SectionHeader } from '@/components/shared/page-header'
 import { Card } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Segmented } from '@/components/ui/segmented'
 import { AreaTrendChart, DonutChart } from '@/components/charts/charts'
 import { PlatformChip } from '@/features/content/components/content-ui'
 import { resolveAccount, useContentScope } from '@/features/content/components/content-flow'
-import { contentAnalytics, contentInsights } from '@/data/mock'
 import { contentSummary } from '@/lib/metrics'
-import { cn, formatDate, formatNumber, formatPercent } from '@/lib/utils'
+import { api } from '@/lib/api-client'
+import type { TrendPoint } from '@/stores/content-store'
+import { formatDate, formatNumber, formatPercent } from '@/lib/utils'
+import { useContentStore } from '@/stores/content-store'
 
 type Period = '7d' | '30d' | '90d'
 
@@ -23,12 +24,29 @@ export function ContentAnalyticsPage() {
   const { format, meta, items, accounts, account } = useContentScope()
   const isLong = format === 'long'
   const [period, setPeriod] = React.useState<Period>('7d')
+  const storeTrend = useContentStore((s) => s.trend)
+  const [remoteTrend, setRemoteTrend] = React.useState<TrendPoint[] | null>(null)
+  React.useEffect(() => {
+    let alive = true
+    const days = period === '7d' ? 7 : period === '30d' ? 30 : 90
+    api.content
+      .getAnalytics({ format, days })
+      .then((res) => {
+        if (alive) {
+          setRemoteTrend(Array.isArray(res?.series) ? (res.series as TrendPoint[]) : [])
+        }
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [format, period])
   const published = items.filter((i) => i.status === 'Published')
   const summary = contentSummary(items)
-  const multiplier = period === '7d' ? 1 : period === '30d' ? 4.1 : 11.8
-  const data = contentAnalytics.map((d) => ({
+  const baseTrend = period === '7d' ? storeTrend[format] : remoteTrend ?? []
+  const data = baseTrend.map((d) => ({
     label: d.label,
-    views: Math.round(d.views * multiplier),
+    views: d.views,
     engagement: d.engagement,
   }))
   const top = [...published].sort((a, b) => b.views - a.views)
@@ -44,18 +62,7 @@ export function ContentAnalyticsPage() {
   const contributionTotal = contribution.reduce((total, entry) => total + entry.value, 0)
   const donutData = contributionTotal
     ? contribution.map((entry) => ({ ...entry, value: Math.round((entry.value / contributionTotal) * 100) }))
-    : contribution.map((entry, index) => ({ ...entry, value: index === 0 ? 100 : 0 }))
-
-  const heatmap = [
-    { day: 'Sen', slots: [2, 3, 2, 1, 2, 4] },
-    { day: 'Sel', slots: [2, 3, 3, 2, 3, 4] },
-    { day: 'Rab', slots: [3, 4, 3, 2, 4, 5] },
-    { day: 'Kam', slots: [3, 4, 4, 3, 5, 5] },
-    { day: 'Jum', slots: [4, 4, 3, 3, 4, 4] },
-    { day: 'Sab', slots: [5, 4, 3, 3, 4, 5] },
-    { day: 'Min', slots: [4, 3, 3, 2, 3, 4] },
-  ]
-  const slots = ['06', '09', '12', '15', '18', '21']
+    : []
 
   return (
     <div>
@@ -85,18 +92,17 @@ export function ContentAnalyticsPage() {
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Total views" value={formatNumber(summary.views * multiplier, true)} delta={18.6} deltaLabel="vs periode lalu" icon={<Eye />} accent="teal" />
-        <MetricCard label="Avg engagement" value={formatPercent(summary.engagement)} delta={2.4} deltaLabel="rate rata-rata" icon={<Heart />} tone="positive" accent="yellow" />
+        <MetricCard label="Total views" value={formatNumber(summary.views, true)} deltaLabel={`${summary.published} konten tayang`} icon={<Eye />} accent="teal" />
+        <MetricCard label="Avg engagement" value={formatPercent(summary.engagement)} deltaLabel="rate rata-rata" icon={<Heart />} tone="positive" accent="yellow" />
         <MetricCard label={isLong ? 'Episode tayang' : 'Klip tayang'} value={`${summary.published} item`} deltaLabel={`avg ${formatNumber(avgViews, true)} views`} icon={<BarChart3 />} accent="pink" />
-        <MetricCard label="Jam terbaik" value={isLong ? 'Kam 18.00' : 'Kam 21.00'} deltaLabel={isLong ? 'watch time tertinggi' : 'completion tertinggi'} icon={<Clock3 />} tone="warning" accent="orange" />
+        <MetricCard label="Dalam produksi" value={`${summary.inProduction} item`} deltaLabel="belum tayang" icon={<Clock3 />} tone="warning" accent="orange" />
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.7fr_1fr]">
         <Card className="p-5">
           <SectionHeader
             title={isLong ? 'Views & watch engagement' : 'Views & completion'}
-            description={period === '7d' ? 'Data harian 7 hari' : `Estimasi ${period} berdasarkan pola harian`}
-            action={<Badge tone="warning">Sebagian estimasi</Badge>}
+            description={period === '7d' ? 'Data harian 7 hari' : `Data harian ${period}`}
           />
           <AreaTrendChart
             data={data}
@@ -108,14 +114,14 @@ export function ContentAnalyticsPage() {
             height={270}
             valueFormatter={(v) => formatNumber(v)}
           />
-          <p className="mt-2 text-[10px] text-text-muted">
-            Untuk periode 30/90 hari, angka diskalakan dari pola 7 hari untuk keperluan demo. Ini
-            bukan laporan platform resmi.
-          </p>
         </Card>
         <Card className="p-5">
           <SectionHeader title="Kontribusi akun" description={`Porsi views ${meta.platforms.join(' & ')}`} />
-          <DonutChart data={donutData} height={190} centerValue={formatNumber(summary.views * multiplier, true)} centerLabel="views" />
+          {donutData.length > 0 ? (
+            <DonutChart data={donutData} height={190} centerValue={formatNumber(summary.views, true)} centerLabel="views" />
+          ) : (
+            <p className="py-10 text-center text-[11px] text-text-muted">Belum ada views dari akun terhubung.</p>
+          )}
           <div className="mt-3 space-y-2">
             {donutData.map((entry) => (
               <div key={entry.name} className="flex items-center gap-2 text-[11px]">
@@ -174,40 +180,6 @@ export function ContentAnalyticsPage() {
           </div>
         </Card>
 
-        <Card className="p-5">
-          <SectionHeader title="Best time to post" description="Skor relatif, bukan data live" />
-          <div className="grid grid-cols-[34px_repeat(6,1fr)] gap-1">
-            <span />
-            {slots.map((s) => (
-              <span key={s} className="text-center text-[8px] text-text-muted">{s}</span>
-            ))}
-            {heatmap.map((row) => (
-              <React.Fragment key={row.day}>
-                <span className="flex items-center text-[9px] text-text-muted">{row.day}</span>
-                {row.slots.map((v, i) => (
-                  <span
-                    key={`${row.day}-${i}`}
-                    title={`${row.day} ${slots[i]}:00 · skor ${v}`}
-                    className={cn('h-6 rounded-[3px] sm:h-7')}
-                    style={{ backgroundColor: `rgba(245,214,75,${0.06 + v * 0.05})` }}
-                  />
-                ))}
-              </React.Fragment>
-            ))}
-          </div>
-          <p className="mt-3 text-[10px] leading-relaxed text-text-muted">
-            {isLong
-              ? 'Slot Kamis 18.00–21.00 punya watch time tertinggi pada data demo.'
-              : 'Slot Kamis 21.00 dan Sabtu 06.00 punya completion tertinggi pada data demo.'}{' '}
-            Validasi dengan analitik platformmu sendiri.
-          </p>
-        </Card>
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {contentInsights.slice(0, 3).map((insight) => (
-          <InsightCard key={insight.id} {...insight} onAction={() => window.location.assign('/app/monitor')} />
-        ))}
       </div>
     </div>
   )

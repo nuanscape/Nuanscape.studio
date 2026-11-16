@@ -1,0 +1,65 @@
+{
+  "workspace": "Nuanscape Demo",
+  "generatedAt": "2026-11-13T09:00:00.000Z",
+  "finance": {
+    "summary": {
+      "income": 18500000,
+      "expense": 11200000,
+      "net": 7300000,
+      "savingsRate": 39.5
+    },
+    "budgets": [
+      { "category": "Ads", "limit": 4000000, "spent": 4600000 },
+      { "category": "Operasional", "limit": 3000000, "spent": 2100000 }
+    ],
+    "goals": [
+      { "name": "Dana darurat", "target": 30000000, "current": 18500000 }
+    ],
+    "recentExpenses": [
+      {
+        "date": "2026-11-12",
+        "category": "Ads",
+        "amount": 1250000,
+        "account": "Business"
+      }
+    ]
+  },
+  "seller": {
+    "metrics": {
+      "grossRevenue": 28400000,
+      "netProfit": 6120000,
+      "orders": 142,
+      "inventoryValue": 18750000
+    },
+    "criticalStock": [
+      { "sku": "LM-LAMP-01", "name": "Lampu Meja", "stock": 6, "minStock": 10 }
+    ],
+    "profitByProduct": [
+      { "sku": "LM-LAMP-01", "name": "Lampu Meja", "profit": 3112200 },
+      { "sku": "DK-DESK-02", "name": "Desk Organizer", "profit": 1850000 }
+    ]
+  },
+  "content": {
+    "summary": {
+      "published": 12,
+      "inProduction": 4,
+      "ideas": 4,
+      "engagement": 7.8
+    },
+    "topContent": [
+      {
+        "title": "Rahasia Produktivitas",
+        "platform": "YouTube",
+        "views": 48200,
+        "engagement": 9.1
+      }
+    ],
+    "pipeline": [
+      {
+        "title": "Setup Meja Minimalis",
+        "status": "Script Ready",
+        "platform": "TikTok"
+      }
+    ]
+  }
+}

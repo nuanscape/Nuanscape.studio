@@ -8,10 +8,9 @@ import {
   Play,
   Plus,
   ShieldCheck,
-  Sparkles,
   Zap,
 } from 'lucide-react'
-import { PageHeader, MetricCard, SectionHeader } from '@/components/shared/page-header'
+import { PageHeader, MetricCard } from '@/components/shared/page-header'
 import WorkflowBlueprint, { type WorkflowApp, type WorkflowGraph } from '@/components/ui/interactive-workflow-blueprint'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'

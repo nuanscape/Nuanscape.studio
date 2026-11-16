@@ -58,6 +58,7 @@ import { useFinanceStore } from '@/stores/finance-store'
 import { useSellerStore } from '@/stores/seller-store'
 import { clamp, cn, formatIDR, formatRelative, pct } from '@/lib/utils'
 import type { AppNotification } from '@/types'
+import { api } from '@/lib/api-client'
 
 type MonitorSection = 'office' | 'team' | 'automation' | 'report' | 'notifications' | 'settings'
 
@@ -97,7 +98,7 @@ const sectionMeta: Record<MonitorSection, { title: string; description: string }
   settings: {
     title: 'API Settings',
     description:
-      'Hubungkan Muhe sebagai head agent ke provider model pilihanmu. Kunci API tersimpan lokal di perangkat ini.',
+      'Hubungkan Muhe sebagai head agent ke provider model pilihanmu. API key dikirim ke backend dan dienkripsi AES-256-GCM sebelum disimpan.',
   },
 }
 
@@ -176,7 +177,7 @@ function OfficeSection() {
       id: 'seller',
       agent: agentProfiles.ucup,
       icon: Store,
-      intro: 'Marketplace, stok, dan order berjalan di TikTok Shop & Shopee.',
+      intro: 'Marketplace, stok, dan order tersinkron dari kanal yang terhubung.',
       href: '/app/seller/overview',
       stats: [
         { label: 'Order aktif', value: `${activeOrders.length}` },
@@ -933,70 +934,198 @@ function NotificationsSection() {
 
 function ApiSettingsSection() {
   const { push } = useToastStore()
-  const { headAgent, status, lastCheckedAt, saveHeadAgent, setStatus, resetHeadAgent } =
-    useApiSettingsStore()
+  const {
+    headAgent,
+    providers,
+    providersLoading,
+    providerError,
+    status,
+    lastCheckedAt,
+    saveHeadAgent,
+    setProviders,
+    setProvidersLoading,
+    setProviderError,
+    setStatus,
+    resetHeadAgent,
+  } = useApiSettingsStore()
   const [draft, setDraft] = React.useState(headAgent)
+  const [keyDraft, setKeyDraft] = React.useState('')
   const [showKey, setShowKey] = React.useState(false)
   const [testing, setTesting] = React.useState(false)
+  const [saving, setSaving] = React.useState(false)
+  const [removing, setRemoving] = React.useState(false)
+
+  const activeConfig = providers.find((provider) => provider.provider === draft.provider)
 
   const patch = (next: Partial<typeof draft>) => setDraft((d) => ({ ...d, ...next }))
 
-  const changeProvider = (provider: ApiProvider) => {
-    if (provider === 'custom') {
-      patch({ provider })
-      return
+  const refresh = React.useCallback(async () => {
+    setProvidersLoading(true)
+    setProviderError(null)
+    try {
+      const res = await api.providers.list()
+      setProviders(res.providers)
+      setDraft((current) => {
+        const active = res.providers.find((provider) => provider.provider === current.provider)
+        return active ? { ...current, baseUrl: active.baseUrl, model: active.model } : current
+      })
+    } catch (err) {
+      setProviderError(err instanceof Error ? err.message : 'Gagal memuat konfigurasi provider.')
+    } finally {
+      setProvidersLoading(false)
     }
+  }, [setProviderError, setProviders, setProvidersLoading])
+
+  React.useEffect(() => {
+    void refresh()
+  }, [refresh])
+
+  const changeProvider = (provider: ApiProvider) => {
     const preset = providerPresets[provider]
-    patch({ provider, baseUrl: preset.baseUrl, model: preset.model })
+    const saved = providers.find((item) => item.provider === provider)
+    setDraft((current) => ({
+      ...current,
+      provider,
+      baseUrl: saved?.baseUrl ?? preset.baseUrl,
+      model: saved?.model ?? preset.model,
+    }))
+    setKeyDraft('')
   }
 
-  const save = () => {
-    if (!draft.baseUrl.trim()) {
-      push({ title: 'Base URL wajib diisi', tone: 'warning' })
-      return
-    }
-    if (!/^https?:\/\//i.test(draft.baseUrl.trim())) {
+  const changeModel = (modelId: string) => {
+    const nextBaseUrl =
+      draft.provider === 'kie.ai' && /^https:\/\/api\.kie\.ai\//i.test(draft.baseUrl)
+        ? `https://api.kie.ai/${modelId}/v1`
+        : draft.baseUrl
+    patch({ model: modelId, baseUrl: nextBaseUrl })
+  }
+
+  const availableModels = activeConfig?.models ?? []
+
+  const save = async () => {
+    const baseUrl = draft.baseUrl.trim()
+    const model = draft.model.trim()
+    const apiKey = keyDraft.trim()
+
+    if (!baseUrl || !/^https?:\/\//i.test(baseUrl)) {
       push({ title: 'Base URL harus diawali http:// atau https://', tone: 'warning' })
       return
     }
-    if (!draft.model.trim()) {
+    if (!model) {
       push({ title: 'Model wajib diisi', tone: 'warning' })
       return
     }
-    saveHeadAgent({
-      ...draft,
-      baseUrl: draft.baseUrl.trim(),
-      model: draft.model.trim(),
-      apiKey: draft.apiKey.trim(),
-    })
-    push({ title: 'API head agent disimpan', description: draft.model.trim(), tone: 'success' })
+    if (!activeConfig?.hasKey && !apiKey) {
+      push({ title: 'API key wajib diisi', description: 'Key akan dienkripsi di backend.', tone: 'warning' })
+      return
+    }
+
+    setSaving(true)
+    try {
+      await api.providers.save({
+        provider: draft.provider,
+        baseUrl,
+        model,
+        ...(apiKey ? { apiKey } : {}),
+      })
+      saveHeadAgent({ provider: draft.provider, baseUrl, model })
+      await api.monitor
+        .saveSettings({ primaryProvider: draft.provider, primaryModel: model })
+        .catch(() => null)
+      setKeyDraft('')
+      await refresh()
+      push({
+        title: apiKey ? 'API key disimpan terenkripsi' : 'Konfigurasi provider disimpan',
+        description: 'AES-256-GCM · key tidak pernah ditulis sebagai plaintext di database.',
+        tone: 'success',
+      })
+    } catch (err) {
+      push({
+        title: 'Gagal menyimpan konfigurasi',
+        description: err instanceof Error ? err.message : 'Backend menolak permintaan.',
+        tone: 'danger',
+      })
+    } finally {
+      setSaving(false)
+    }
   }
 
   const testConnection = async () => {
-    if (!draft.apiKey.trim()) {
+    const apiKey = keyDraft.trim()
+    if (!activeConfig?.hasKey && !apiKey) {
       setStatus('error')
-      push({ title: 'API key belum diisi', tone: 'warning' })
+      push({ title: 'API key belum tersimpan', description: 'Simpan key terlebih dahulu.', tone: 'warning' })
       return
     }
+
     setTesting(true)
-    await new Promise((resolve) => setTimeout(resolve, 700))
-    setTesting(false)
-    setStatus('connected')
-    push({ title: 'Koneksi API terverifikasi', description: 'Mode demo: tidak ada request ke provider.', tone: 'success' })
+    try {
+      const res = await api.providers.test(draft.provider, {
+        baseUrl: draft.baseUrl.trim(),
+        model: draft.model.trim(),
+        ...(apiKey ? { apiKey } : {}),
+      })
+      setStatus(res.status === 'connected' ? 'connected' : 'error')
+      await refresh()
+      push({
+        title: res.status === 'connected' ? 'Koneksi API terverifikasi' : 'Koneksi gagal',
+        description: res.message ?? 'Provider tidak merespons.',
+        tone: res.status === 'connected' ? 'success' : 'danger',
+      })
+    } catch (err) {
+      setStatus('error')
+      await refresh()
+      push({
+        title: 'Koneksi API gagal',
+        description: err instanceof Error ? err.message : 'Provider tidak merespons.',
+        tone: 'danger',
+      })
+    } finally {
+      setTesting(false)
+    }
+  }
+
+  const removeKey = async () => {
+    if (!activeConfig || activeConfig.keySource !== 'database') return
+    if (!window.confirm(`Hapus API key ${activeConfig.label} dari database?`)) return
+
+    setRemoving(true)
+    try {
+      await api.providers.remove(draft.provider)
+      setKeyDraft('')
+      await refresh()
+      push({ title: 'API key dihapus', description: activeConfig.label, tone: 'info' })
+    } catch (err) {
+      push({
+        title: 'Gagal menghapus API key',
+        description: err instanceof Error ? err.message : 'Coba lagi.',
+        tone: 'danger',
+      })
+    } finally {
+      setRemoving(false)
+    }
   }
 
   const reset = () => {
     resetHeadAgent()
     setDraft(defaultHeadAgentConfig)
+    setKeyDraft('')
     push({ title: 'API head agent dikembalikan ke default', tone: 'info' })
   }
 
+  const effectiveStatus = status !== 'idle' ? status : activeConfig?.lastTestStatus ?? 'idle'
   const statusMeta =
-    status === 'connected'
+    effectiveStatus === 'connected'
       ? { label: 'Terhubung', tone: 'success' as const }
-      : status === 'error'
+      : effectiveStatus === 'error'
         ? { label: 'Gagal', tone: 'danger' as const }
         : { label: 'Belum diuji', tone: 'outline' as const }
+
+  const credentialLabel = activeConfig?.hasKey
+    ? activeConfig.keySource === 'database'
+      ? `Terenkripsi · ${activeConfig.maskedKey ?? ''}`
+      : `Env server · ${activeConfig.maskedKey ?? ''}`
+    : 'Belum disimpan'
 
   return (
     <div className="space-y-4">
@@ -1006,6 +1135,9 @@ function ApiSettingsSection() {
             <div className="flex items-center gap-2">
               <KeyRound className="size-4 text-primary" />
               <h3 className="text-[13px] font-semibold text-white">Koneksi API head agent</h3>
+              {providersLoading ? (
+                <span className="text-[10px] text-white/35">Memuat config...</span>
+              ) : null}
             </div>
             <div className="mt-3 flex items-center gap-3 rounded-xl border border-line bg-white/[0.02] p-3">
               <img
@@ -1022,22 +1154,25 @@ function ApiSettingsSection() {
               <Badge tone={statusMeta.tone}>{statusMeta.label}</Badge>
             </div>
 
+            {providerError ? (
+              <p className="mt-3 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[10.5px] text-danger">
+                {providerError}
+              </p>
+            ) : null}
+
             <div className="mt-3 space-y-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Provider">
                   <Select value={draft.provider} onChange={(e) => changeProvider(e.target.value as ApiProvider)}>
-                    <option value="openai">OpenAI</option>
-                    <option value="anthropic">Anthropic</option>
-                    <option value="gemini">Google Gemini</option>
-                    <option value="openrouter">OpenRouter</option>
-                    <option value="custom">Custom / self-hosted</option>
+                    <option value="kie.ai">KIE.ai</option>
+                    <option value="nvidia">NVIDIA NIM</option>
                   </Select>
                 </Field>
                 <Field label="Model">
                   <Input
                     value={draft.model}
                     onChange={(e) => patch({ model: e.target.value })}
-                    placeholder="gpt-4o-mini"
+                    placeholder="gpt-5-2"
                   />
                 </Field>
               </div>
@@ -1046,19 +1181,26 @@ function ApiSettingsSection() {
                 <Input
                   value={draft.baseUrl}
                   onChange={(e) => patch({ baseUrl: e.target.value })}
-                  placeholder="https://api.openai.com/v1"
+                  placeholder="https://api.kie.ai/gpt-5-2/v1"
                   spellCheck={false}
                 />
               </Field>
 
-              <Field label="API key" hint="Disimpan lokal di browser ini, tidak dikirim ke mana pun.">
+              <Field
+                label="API key"
+                hint={
+                  activeConfig?.hasKey
+                    ? `Tersimpan: ${activeConfig.maskedKey ?? '••••'}. Kosongkan untuk mempertahankan, isi untuk rotasi.`
+                    : 'Dikirim sekali ke backend, dienkripsi AES-256-GCM, tidak disimpan di localStorage.'
+                }
+              >
                 <div className="relative">
                   <Input
                     type={showKey ? 'text' : 'password'}
-                    value={draft.apiKey}
-                    onChange={(e) => patch({ apiKey: e.target.value })}
-                    placeholder="sk-..."
-                    autoComplete="off"
+                    value={keyDraft}
+                    onChange={(e) => setKeyDraft(e.target.value)}
+                    placeholder={activeConfig?.hasKey ? 'Kosongkan untuk mempertahankan key' : 'Masukkan API key...'}
+                    autoComplete="new-password"
                     spellCheck={false}
                     className="pr-11"
                   />
@@ -1105,12 +1247,17 @@ function ApiSettingsSection() {
               </Field>
 
               <div className="flex flex-wrap items-center gap-2 pt-1">
-                <Button size="sm" onClick={save}>
+                <Button size="sm" onClick={() => void save()} loading={saving}>
                   <Save /> Simpan
                 </Button>
-                <Button variant="secondary" size="sm" onClick={testConnection} loading={testing}>
+                <Button variant="secondary" size="sm" onClick={() => void testConnection()} loading={testing}>
                   <Zap /> Test koneksi
                 </Button>
+                {activeConfig?.keySource === 'database' ? (
+                  <Button variant="ghost" size="sm" onClick={() => void removeKey()} loading={removing}>
+                    Hapus key
+                  </Button>
+                ) : null}
                 <Button variant="ghost" size="sm" onClick={reset}>
                   <RotateCcw /> Reset
                 </Button>
@@ -1128,7 +1275,7 @@ function ApiSettingsSection() {
                 <div className="flex items-center justify-between gap-3 border-b border-line pb-2">
                   <span className="text-[11px] text-white/40">Provider</span>
                   <span className="text-[11px] text-white/75">
-                    {draft.provider === 'custom' ? 'Custom' : providerPresets[draft.provider].label}
+                    {providerPresets[draft.provider]?.label ?? draft.provider}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3 border-b border-line pb-2">
@@ -1137,16 +1284,110 @@ function ApiSettingsSection() {
                 </div>
                 <div className="flex items-center justify-between gap-3 border-b border-line pb-2">
                   <span className="text-[11px] text-white/40">Kredensial</span>
-                  <span className="text-[11px] text-white/75">
-                    {headAgent.apiKey ? 'Tersimpan lokal' : 'Belum diisi'}
+                  <span className="max-w-[60%] truncate text-right text-[11px] text-white/75">
+                    {credentialLabel}
                   </span>
+                </div>
+                <div className="flex items-center justify-between gap-3 border-b border-line pb-2">
+                  <span className="text-[11px] text-white/40">Enkripsi</span>
+                  <span className="text-[11px] text-white/75">{activeConfig?.encryption ?? '—'}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-[11px] text-white/40">Terakhir diuji</span>
                   <span className="text-[11px] text-white/75">
-                    {lastCheckedAt ? formatRelative(lastCheckedAt) : '—'}
+                    {activeConfig?.lastTestedAt
+                      ? formatRelative(activeConfig.lastTestedAt)
+                      : lastCheckedAt
+                        ? formatRelative(lastCheckedAt)
+                        : '—'}
                   </span>
                 </div>
+              </div>
+            </Card>
+
+            <Card className="p-4 sm:p-5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Bot className="size-4 text-primary" />
+                  <h3 className="text-[13px] font-semibold text-white">Model tersedia</h3>
+                </div>
+                <Badge tone="outline">{availableModels.length} model</Badge>
+              </div>
+              <p className="mt-1 text-[10px] text-white/40">
+                {providerPresets[draft.provider]?.label ?? draft.provider} · klik model untuk memakai di head agent.
+              </p>
+              <div className="mt-3 space-y-1.5">
+                {providersLoading ? (
+                  <p className="text-[10.5px] text-white/40">Memuat model...</p>
+                ) : availableModels.length ? (
+                  availableModels.map((model) => {
+                    const selected = draft.model === model.id
+                    return (
+                      <button
+                        key={model.id}
+                        type="button"
+                        onClick={() => changeModel(model.id)}
+                        className={cn(
+                          'flex w-full items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-left transition-colors',
+                          selected
+                            ? 'border-primary/40 bg-primary/10'
+                            : 'border-line bg-white/[0.02] hover:bg-white/[0.04]',
+                        )}
+                      >
+                        <span className="min-w-0">
+                          <span className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-[11px] font-medium text-white/85">{model.label}</span>
+                            {model.active ? (
+                              <Badge tone="success" className="text-[8px]">Aktif</Badge>
+                            ) : selected ? (
+                              <Badge tone="primary" className="text-[8px]">Dipilih</Badge>
+                            ) : model.recommended ? (
+                              <Badge tone="outline" className="text-[8px]">Rekomendasi</Badge>
+                            ) : null}
+                          </span>
+                          <span className="mt-0.5 block truncate text-[9px] text-white/35">{model.id}</span>
+                        </span>
+                        {selected ? <CheckCheck className="size-3.5 shrink-0 text-primary" /> : null}
+                      </button>
+                    )
+                  })
+                ) : (
+                  <p className="text-[10.5px] text-white/40">Model belum tersedia.</p>
+                )}
+              </div>
+            </Card>
+
+            <Card className="p-4 sm:p-5">
+              <div className="flex items-center gap-2">
+                <Blocks className="size-4 text-primary" />
+                <h3 className="text-[13px] font-semibold text-white">Provider terdaftar</h3>
+              </div>
+              <div className="mt-3 space-y-2">
+                {providers.length ? (
+                  providers.map((provider) => (
+                    <button
+                      key={provider.provider}
+                      type="button"
+                      onClick={() => changeProvider(provider.provider)}
+                      className={cn(
+                        'flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left transition-colors',
+                        provider.provider === draft.provider
+                          ? 'border-primary/40 bg-primary/10'
+                          : 'border-line bg-white/[0.02] hover:bg-white/[0.04]',
+                      )}
+                    >
+                      <span className="min-w-0">
+                        <span className="block text-[11px] font-medium text-white/85">{provider.label}</span>
+                        <span className="block truncate text-[9.5px] text-white/35">{provider.model}</span>
+                      </span>
+                      <Badge tone={provider.hasKey ? 'success' : 'outline'}>
+                        {provider.hasKey ? 'Key ada' : 'Belum ada'}
+                      </Badge>
+                    </button>
+                  ))
+                ) : (
+                  <p className="text-[10.5px] text-white/40">Belum ada provider yang dikonfigurasi.</p>
+                )}
               </div>
             </Card>
 
@@ -1166,7 +1407,7 @@ function ApiSettingsSection() {
                 </p>
                 <p className="flex gap-2">
                   <span className="mt-1.5 size-1 shrink-0 rounded-full bg-primary" />
-                  Kunci API hanya tersimpan di perangkat ini.
+                  API key dienkripsi AES-256-GCM dan hanya didekripsi di server saat dipakai.
                 </p>
               </div>
             </Card>
@@ -1176,4 +1417,3 @@ function ApiSettingsSection() {
     </div>
   )
 }
-

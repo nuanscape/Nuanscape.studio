@@ -192,7 +192,7 @@ export function SellerInventoryPage() {
             </Field>
           </div>
           <p className="rounded-lg border border-line bg-white/[0.02] p-2.5 text-[10px] leading-relaxed text-text-muted">
-            Hanya penambahan stok yang didukung pada demo ini. Pengurangan karena penjualan berasal
+            Hanya penambahan stok yang didukung saat ini. Pengurangan karena penjualan berasal
             dari pesanan marketplace.
           </p>
         </div>

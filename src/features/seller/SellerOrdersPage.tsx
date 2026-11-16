@@ -189,7 +189,7 @@ export function SellerOrdersPage() {
               </Select>
               <p className="mt-2 text-[10px] leading-relaxed text-text-muted">
                 Perubahan status hanya tersimpan lokal. Tidak ada pembaruan yang dikirim ke
-                marketplace pada demo ini.
+                marketplace saat ini.
               </p>
             </div>
             <div className="flex flex-wrap gap-1.5">

@@ -1,0 +1,79 @@
+{
+  "version": 3,
+  "agents": {
+    "defaults": {
+      "workspace": "./workspace",
+      "restrict_to_workspace": true,
+      "allow_read_outside_workspace": false,
+      "model_name": "kie-gemini",
+      "model_fallbacks": ["nvidia-llama"],
+      "max_tokens": 4096,
+      "temperature": 0.2,
+      "max_tool_iterations": 12,
+      "max_parallel_turns": 1
+    },
+    "list": [
+      {
+        "id": "muhe",
+        "name": "Muhe",
+        "default": true,
+        "workspace": "./workspace",
+        "subagents": { "allow_agents": ["asep", "ucup", "bambang"] }
+      },
+      { "id": "asep", "name": "Asep", "workspace": "./workspace-asep" },
+      { "id": "ucup", "name": "Ucup", "workspace": "./workspace-ucup" },
+      { "id": "bambang", "name": "Bambang", "workspace": "./workspace-bambang" }
+    ]
+  },
+  "model_list": [
+    {
+      "model_name": "kie-gpt5",
+      "provider": "openai",
+      "model": "gpt-5-2",
+      "api_base": "https://api.kie.ai/gpt-5-2/v1",
+      "request_timeout": 120
+    },
+    {
+      "model_name": "kie-gemini",
+      "provider": "openai",
+      "model": "gemini-3.1-pro",
+      "api_base": "https://api.kie.ai/gemini-3.1-pro/v1",
+      "request_timeout": 120
+    },
+    {
+      "model_name": "kie-kimi",
+      "provider": "openai",
+      "model": "kimi-k3-1-pro",
+      "api_base": "https://api.kie.ai/kimi-k3-1-pro/v1",
+      "request_timeout": 120
+    },
+    {
+      "model_name": "nvidia-llama",
+      "provider": "openai",
+      "model": "nvidia/nvidia/nemotron-3.5-lightning-30b-a3b",
+      "api_base": "https://integrate.api.nvidia.com/v1",
+      "request_timeout": 120
+    }
+  ],
+  "tools": {
+    "exec": { "enabled": false },
+    "web": { "enabled": false },
+    "cron": { "enabled": false },
+    "skills": { "enabled": false },
+    "find_skills": { "enabled": false },
+    "install_skill": { "enabled": false },
+    "message": { "enabled": false },
+    "send_file": { "enabled": false },
+    "send_tts": { "enabled": false },
+    "load_image": { "enabled": false },
+    "mcp": { "enabled": false },
+    "write_file": { "enabled": false },
+    "edit_file": { "enabled": false },
+    "append_file": { "enabled": false },
+    "spawn": { "enabled": true },
+    "subagent": { "enabled": true },
+    "read_file": { "enabled": true },
+    "list_dir": { "enabled": true }
+  },
+  "gateway": { "log_level": "warn" }
+}

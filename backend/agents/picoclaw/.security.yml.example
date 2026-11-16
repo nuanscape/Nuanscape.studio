@@ -1,0 +1,13 @@
+model_list:
+  kie-kimi:
+    api_keys:
+      - "<KIE_API_KEY>"
+  kie-gpt5:
+    api_keys:
+      - "<KIE_API_KEY>"
+  kie-gemini:
+    api_keys:
+      - "<KIE_API_KEY>"
+  nvidia-llama:
+    api_keys:
+      - "<NVIDIA_API_KEY>"

@@ -177,7 +177,7 @@ export function TransactionModal({
           </Field>
         </div>
         <p className="text-[10px] leading-relaxed text-text-muted">
-          Transaksi langsung tersimpan di store demo. Pemasukan dan pengeluaran pada akun berbeda
+          Transaksi langsung tersimpan di database. Pemasukan dan pengeluaran pada akun berbeda
           tidak digabung otomatis.
         </p>
       </form>

@@ -1,3 +1,4 @@
+import * as React from 'react'
 import {
   AlertTriangle,
   Bot,
@@ -15,28 +16,77 @@ import { PageHeader, SectionHeader, MetricCard } from '@/components/shared/page-
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { shopInsights, marketplaces } from '@/data/mock'
+import { api } from '@/lib/api-client'
+import type { AIInsight } from '@/types'
 import { useAutomationStore } from '@/stores/automation-store'
 import { useSellerStore } from '@/stores/seller-store'
 import { useToastStore } from '@/stores/app-store'
 import { agentProfiles } from '@/features/monitor/components/agents'
 import { MarketplaceBadge } from '@/features/seller/components/seller-ui'
 import { formatDate, formatIDR } from '@/lib/utils'
-import { shopMetrics } from '@/lib/metrics'
+import { buildSellerLedger, summarizeLedger } from '@/lib/seller-ledger'
+
+interface MarketplaceStat {
+  name: 'TikTok Shop' | 'Shopee'
+  revenue: number
+  orders: number
+}
 
 export function SellerAgentReportPage() {
   const products = useSellerStore((s) => s.products)
   const orders = useSellerStore((s) => s.orders)
   const movements = useSellerStore((s) => s.movements)
   const connections = useSellerStore((s) => s.connections)
+  const vouchers = useSellerStore((s) => s.vouchers)
+  const flashSales = useSellerStore((s) => s.flashSales)
+  const ads = useSellerStore((s) => s.ads)
   const fees = useSellerStore((s) => s.fees)
   const { push } = useToastStore()
+
+  const [backendRecommendations, setBackendRecommendations] = React.useState<AIInsight[] | null>(null)
+  const [backendMarketplaces, setBackendMarketplaces] = React.useState<MarketplaceStat[] | null>(null)
+
+  React.useEffect(() => {
+    let alive = true
+    api.seller
+      .getAgentReport()
+      .then((res) => {
+        if (!alive) return
+        const report = res as {
+          recommendations?: { id: string; title: string; detail: string; why?: string; action?: string }[]
+          marketplaces?: MarketplaceStat[]
+        }
+        if (Array.isArray(report.recommendations) && report.recommendations.length > 0) {
+          setBackendRecommendations(
+            report.recommendations.map((item) => ({
+              id: item.id,
+              title: item.title,
+              detail: item.detail,
+              why: item.why ?? 'Tidak ada alasan terperinci dari backend.',
+              tone: 'neutral' as const,
+              ...(item.action ? { action: item.action } : {}),
+            })),
+          )
+        }
+        if (Array.isArray(report.marketplaces) && report.marketplaces.length > 0) {
+          setBackendMarketplaces(report.marketplaces)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
 
   const automations = useAutomationStore((s) => s.items)
   const approve = useAutomationStore((s) => s.approve)
 
   const ucup = agentProfiles.ucup
-  const metrics = shopMetrics(products, fees)
+  const ledger = React.useMemo(
+    () => buildSellerLedger({ orders, products, connections, vouchers, flashSales, ads, fees }),
+    [orders, products, connections, vouchers, flashSales, ads, fees],
+  )
+  const metrics = React.useMemo(() => summarizeLedger(ledger), [ledger])
 
   const pendingOrders = orders.filter((o) => o.status === 'Pending' || o.status === 'Processing')
   const shippedOrders = orders.filter((o) => o.status === 'Shipped')
@@ -47,6 +97,66 @@ export function SellerAgentReportPage() {
   const connectedStores = connections.filter((c) => c.status === 'connected')
   const shopAutomations = automations.filter((a) => a.module === 'Shop')
   const approvals = shopAutomations.filter((a) => a.status === 'needs_approval')
+
+  const derivedMarketplaces: MarketplaceStat[] = (['TikTok Shop', 'Shopee'] as const)
+    .map((name) => {
+      const entries = ledger.filter((e) => e.type === 'income' && e.marketplace === name)
+      return {
+        name,
+        revenue: entries.reduce((a, e) => a + e.amount, 0),
+        orders: entries.length,
+      }
+    })
+    .filter((m) => m.orders > 0)
+
+  const derivedRecommendations: AIInsight[] = []
+  if (outOfStock.length > 0) {
+    derivedRecommendations.push({
+      id: 'agent-stock-out',
+      title: `Restock ${outOfStock.length} produk yang habis`,
+      detail: outOfStock.map((p) => p.name).join(', '),
+      why: 'Diambil dari produk tersimpan dengan stok 0.',
+      tone: 'danger',
+      action: 'Buka inventory',
+    })
+  }
+  if (lowStock.length > 0) {
+    derivedRecommendations.push({
+      id: 'agent-stock-low',
+      title: `${lowStock.length} produk mendekati stok minimum`,
+      detail: lowStock.map((p) => `${p.name} (${p.stock}/${p.minStock})`).join(', '),
+      why: 'Diambil dari produk tersimpan yang stoknya di bawah minimum.',
+      tone: 'warning',
+      action: 'Tinjau inventory',
+    })
+  }
+  if (pendingOrders.length > 0) {
+    derivedRecommendations.push({
+      id: 'agent-pending',
+      title: `${pendingOrders.length} pesanan menunggu diproses`,
+      detail: `${formatIDR(pendingOrders.reduce((a, o) => a + o.total, 0))} nilai pesanan belum diselesaikan.`,
+      why: 'Dihitung dari order tersimpan berstatus Pending atau Processing.',
+      tone: 'warning',
+      action: 'Proses pesanan',
+    })
+  }
+  const marginLeader = [...activeProducts]
+    .filter((p) => p.price > 0 && p.sold > 0)
+    .sort((a, b) => (b.price - b.cost) / b.price - (a.price - a.cost) / a.price)[0]
+  if (marginLeader) {
+    const pct = ((marginLeader.price - marginLeader.cost) / marginLeader.price) * 100
+    derivedRecommendations.push({
+      id: 'agent-margin',
+      title: `Dorong ${marginLeader.name}`,
+      detail: `Margin kotor ${pct.toFixed(1)}% dari ${marginLeader.sold} unit terjual.`,
+      why: 'Dihitung dari harga jual, HPP, dan unit terjual pada produk tersimpan.',
+      tone: pct >= 30 ? 'positive' : 'neutral',
+      action: 'Lihat produk',
+    })
+  }
+
+  const recommendations = backendRecommendations ?? derivedRecommendations
+  const marketplaceStats = backendMarketplaces ?? derivedMarketplaces
 
   const recentOrders = [...orders].sort((a, b) => +new Date(b.date) - +new Date(a.date))
   const recentMovements = [...movements].sort((a, b) => +new Date(b.date) - +new Date(a.date))
@@ -209,7 +319,7 @@ export function SellerAgentReportPage() {
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="Revenue 30 hari"
-          value={formatIDR(metrics.netSales, { compact: true })}
+          value={formatIDR(metrics.income - metrics.discounts - metrics.refunds, { compact: true })}
           deltaLabel={`${metrics.orders} order tersinkron`}
           icon={<Wallet />}
           accent="orange"
@@ -217,7 +327,7 @@ export function SellerAgentReportPage() {
         />
         <MetricCard
           label="Net profit"
-          value={formatIDR(metrics.netProfit, { compact: true })}
+          value={formatIDR(metrics.net, { compact: true })}
           deltaLabel={`margin ${metrics.margin.toFixed(1)}%`}
           icon={<TrendingUp />}
           accent="teal"
@@ -389,7 +499,7 @@ export function SellerAgentReportPage() {
         <Card className="p-5">
           <SectionHeader title="Performa marketplace" description="Revenue 30 hari berdasarkan order tersinkron" />
           <div className="space-y-2">
-            {marketplaces.map((m) => {
+            {marketplaceStats.map((m) => {
               const accounts = connections.filter((c) => c.name === m.name)
               const linked = accounts.filter((c) => c.status === 'connected').length
               const platformSync = accounts
@@ -422,13 +532,16 @@ export function SellerAgentReportPage() {
                 </div>
               )
             })}
+            {marketplaceStats.length === 0 ? (
+              <p className="py-8 text-center text-[11px] text-text-muted">Belum ada revenue tersinkron.</p>
+            ) : null}
           </div>
         </Card>
 
         <Card className="p-5">
           <SectionHeader title="Saran dari Ucup" description="Rekomendasi untuk meningkatkan performa seller center" />
           <div className="grid grid-cols-1 gap-3">
-            {shopInsights.map((insight) => (
+            {recommendations.map((insight) => (
               <div key={insight.id} className="rounded-xl border border-line bg-white/[0.02] p-4">
                 <div className="flex items-start gap-2">
                   <Lightbulb className="mt-0.5 size-4 shrink-0 text-primary" />
@@ -441,6 +554,11 @@ export function SellerAgentReportPage() {
                 </div>
               </div>
             ))}
+            {recommendations.length === 0 ? (
+              <p className="py-8 text-center text-[11px] text-text-muted">
+                Belum ada saran. Produk dan pesanan tersinkron akan dianalisis di sini.
+              </p>
+            ) : null}
           </div>
         </Card>
       </div>

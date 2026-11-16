@@ -24,7 +24,7 @@ import {
   scopeLedger,
   summarizeLedger,
 } from '@/lib/seller-ledger'
-import { shopInsights } from '@/data/mock'
+import type { AIInsight } from '@/types'
 import { cn, formatDate, formatIDR, formatPercent } from '@/lib/utils'
 import { AccountBadge, MarketplaceBadge, OrderStatusBadge, StockBar } from '@/features/seller/components/seller-ui'
 
@@ -82,6 +82,55 @@ export function SellerOverviewPage() {
   const recent = [...scopedOrders].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 6)
   const connectedAccounts = connections.filter((c) => c.status === 'connected')
 
+  const insights: AIInsight[] = []
+  if (outOfStock.length > 0) {
+    insights.push({
+      id: 'stock-out',
+      title: `${outOfStock.length} produk kehabisan stok`,
+      detail: outOfStock.map((p) => `${p.name} (${p.sku})`).join(', '),
+      why: 'Diambil dari produk tersimpan dengan stok 0.',
+      tone: 'danger',
+      action: 'Restock',
+    })
+  }
+  if (lowStock.length > 0) {
+    insights.push({
+      id: 'stock-low',
+      title: `${lowStock.length} produk di bawah stok minimum`,
+      detail: lowStock.map((p) => `${p.name} (${p.stock}/${p.minStock})`).join(', '),
+      why: 'Diambil dari produk tersimpan yang stoknya di bawah minimum.',
+      tone: 'warning',
+      action: 'Tinjau inventory',
+    })
+  }
+  const bestMargin = [...scopedProducts]
+    .filter((p) => p.price > 0 && p.sold > 0)
+    .sort((a, b) => (b.price - b.cost) / b.price - (a.price - a.cost) / a.price)[0]
+  if (bestMargin) {
+    const pct = ((bestMargin.price - bestMargin.cost) / bestMargin.price) * 100
+    insights.push({
+      id: 'best-margin',
+      title: `Margin tertinggi: ${bestMargin.name}`,
+      detail: `${formatPercent(pct)} margin kotor dari ${bestMargin.sold} unit terjual.`,
+      why: 'Dihitung dari harga jual, HPP, dan unit terjual pada produk tersimpan.',
+      tone: pct >= 30 ? 'positive' : 'neutral',
+      action: 'Lihat profit',
+    })
+  }
+  if (tiktokIncome > 0 && shopeeIncome > 0) {
+    const leader = tiktokIncome >= shopeeIncome ? 'TikTok Shop' : 'Shopee'
+    const leaderValue = Math.max(tiktokIncome, shopeeIncome)
+    const total = tiktokIncome + shopeeIncome
+    insights.push({
+      id: 'platform-mix',
+      title: `${leader} memimpin pemasukan`,
+      detail: `${formatPercent((leaderValue / total) * 100)} dari pemasukan settled pada cakupan ini.`,
+      why: 'Dihitung dari order berstatus settled yang tersinkron.',
+      tone: 'neutral',
+      action: 'Bandingkan',
+    })
+  }
+
   const restock = (id: string, name: string, qty: number) => {
     restockProduct(id, qty)
     push({ title: 'Restock dicatat', description: `${qty} unit ${name} ditambahkan.`, tone: 'success' })
@@ -132,23 +181,30 @@ export function SellerOverviewPage() {
         </Card>
         <Card className="p-5">
           <SectionHeader title="Marketplace mix" description="Porsi pemasukan tercatat" />
-          <DonutChart
-            data={platformMix.length ? platformMix : [{ name: 'Belum ada', value: 1, color: '#2a2a2a' }]}
-            height={170}
-            centerValue={formatIDR(metrics.income, { compact: true })}
-            centerLabel="pemasukan"
-          />
-          <div className="mt-3 space-y-2">
-            {platformMix.map((m) => (
-              <div key={m.name} className="flex items-center gap-2 text-[11px]">
-                <span className="size-2 rounded-full" style={{ backgroundColor: m.color }} />
-                <span className="flex-1 text-text-secondary">{m.name}</span>
-                <span className="text-text-muted">{incomeEntries.filter((e) => e.marketplace === m.name).length} order</span>
-                <span className="num text-text-primary">{formatIDR(m.value, { compact: true })}</span>
+          {platformMix.length > 0 ? (
+            <>
+              <DonutChart
+                data={platformMix}
+                height={170}
+                centerValue={formatIDR(metrics.income, { compact: true })}
+                centerLabel="pemasukan"
+              />
+              <div className="mt-3 space-y-2">
+                {platformMix.map((m) => (
+                  <div key={m.name} className="flex items-center gap-2 text-[11px]">
+                    <span className="size-2 rounded-full" style={{ backgroundColor: m.color }} />
+                    <span className="flex-1 text-text-secondary">{m.name}</span>
+                    <span className="text-text-muted">{incomeEntries.filter((e) => e.marketplace === m.name).length} order</span>
+                    <span className="num text-text-primary">{formatIDR(m.value, { compact: true })}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-            {platformMix.length === 0 ? <p className="text-[10px] text-text-muted">Belum ada pemasukan settled pada cakupan ini.</p> : null}
-          </div>
+            </>
+          ) : (
+            <p className="py-14 text-center text-[11px] text-text-muted">
+              Belum ada pemasukan settled pada cakupan ini.
+            </p>
+          )}
         </Card>
       </div>
 
@@ -247,6 +303,9 @@ export function SellerOverviewPage() {
                 <p className="num w-20 text-right text-[11px] text-text-primary">{formatIDR(o.total, { compact: true })}</p>
               </div>
             ))}
+            {recent.length === 0 ? (
+              <p className="px-5 py-8 text-[11px] text-text-muted">Belum ada pesanan pada cakupan ini.</p>
+            ) : null}
           </div>
         </Card>
       </div>
@@ -289,15 +348,20 @@ export function SellerOverviewPage() {
             action={<button onClick={() => window.location.assign('/app/monitor')} className="text-[10px] text-primary">Tanya Nuanscape AI</button>}
           />
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {shopInsights.slice(0, 4).map((insight) => (
+            {insights.map((insight) => (
               <InsightCard key={insight.id} {...insight} onAction={() => window.location.assign('/app/monitor')} />
             ))}
+            {insights.length === 0 ? (
+              <p className="text-[11px] text-text-muted sm:col-span-2">
+                Belum ada insight. Produk dan pesanan yang tersinkron akan muncul di sini.
+              </p>
+            ) : null}
           </div>
           <div className="mt-3 flex items-start gap-2 rounded-lg border border-warning/20 bg-warning/[0.04] p-2.5">
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warning" />
             <p className="text-[10px] leading-relaxed text-text-muted">
-              Estimasi kehilangan penjualan dihitung dari rata-rata penjualan harian × harga. Bukan
-              angka pasti dan tidak memperhitungkan musim.
+              Insight di atas dihitung dari produk, pesanan, dan fee yang tersimpan. Bukan proyeksi
+              resmi marketplace.
             </p>
           </div>
         </Card>

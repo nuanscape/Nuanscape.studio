@@ -163,7 +163,7 @@ export function FinanceTransactionsPage() {
       </Card>
 
       <p className="mt-3 text-[10px] leading-relaxed text-text-muted">
-        Data tersimpan lokal di browser (demo). Kategori dan akun digunakan untuk analisis AI. Tidak
+        Data tersimpan di database. Kategori dan akun digunakan untuk analisis AI. Tidak
         ada koneksi bank sungguhan pada versi ini.
       </p>
 

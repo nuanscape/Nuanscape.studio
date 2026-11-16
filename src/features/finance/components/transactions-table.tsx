@@ -106,7 +106,7 @@ export function TransactionsTable({
           setToDelete(null)
         }}
         title="Hapus transaksi?"
-        description={toDelete ? `“${toDelete.description}” (${formatIDR(toDelete.amount)}) akan dihapus dari catatan demo.` : undefined}
+        description={toDelete ? `“${toDelete.description}” (${formatIDR(toDelete.amount)}) akan dihapus dari catatan.` : undefined}
         confirmLabel="Hapus"
       />
     </>

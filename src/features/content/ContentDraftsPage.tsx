@@ -4,7 +4,6 @@ import { PageHeader, SectionHeader } from '@/components/shared/page-header'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { platformColor } from '@/features/content/components/content-ui'
-import { platformAccounts } from '@/data/mock'
 import { useContentStore } from '@/stores/content-store'
 import { formatDate, formatNumber } from '@/lib/utils'
 import type { Platform } from '@/types'
@@ -26,28 +25,34 @@ function Thumb({ title, url, platform }: { title: string; url?: string; platform
 
 export function ContentDraftsPage() {
   const items = useContentStore((s) => s.items)
+  const accounts = useContentStore((s) => s.accounts)
   const drafts = items.filter((i) => i.generated || i.previewUrl || i.videoUrl)
 
   return (
     <div>
       <PageHeader
         title="Draft"
-        description="Seluruh hasil generate konten dari 3 platform dan 3 akun masing-masing platform."
+        description="Seluruh hasil generate konten untuk akun yang terhubung."
       />
 
       <div className="space-y-6">
         {platforms.map((platform) => {
-          const accounts = platformAccounts.filter((a) => a.platform === platform)
+          const platformAccounts = accounts.filter((a) => a.platform === platform)
           const platformDrafts = drafts.filter((d) => d.platform === platform)
           return (
             <Card key={platform} className="p-5">
               <SectionHeader
                 title={platform}
-                description={`${platformDrafts.length} hasil generate · ${accounts.length} akun`}
+                description={`${platformDrafts.length} hasil generate · ${platformAccounts.length} akun`}
                 action={<Badge tone="outline" style={{ borderColor: `${platformColor[platform]}55`, color: platformColor[platform] }}>{platform}</Badge>}
               />
+              {platformAccounts.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-[11px] text-text-muted">
+                  Belum ada akun {platform} terhubung.
+                </div>
+              ) : (
               <div className="space-y-5">
-                {accounts.map((account) => {
+                {platformAccounts.map((account) => {
                   const accDrafts = drafts.filter((d) => d.accountId === account.id)
                   return (
                     <div key={account.id}>
@@ -96,6 +101,7 @@ export function ContentDraftsPage() {
                   )
                 })}
               </div>
+              )}
             </Card>
           )
         })}

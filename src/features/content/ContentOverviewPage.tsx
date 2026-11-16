@@ -2,14 +2,14 @@
 import { Card } from '@/components/ui/card'
 import { AreaTrendChart, BarTrendChart } from '@/components/charts/charts'
 import { PlatformLogo, platformColor } from '@/features/content/components/content-ui'
-import { contentAnalytics, platformAccounts } from '@/data/mock'
+import { useContentStore } from '@/stores/content-store'
 import { formatIDR, formatNumber, formatPercent } from '@/lib/utils'
 import type { Platform } from '@/types'
 
 const platforms: Platform[] = ['YouTube', 'TikTok', 'Instagram']
 const earningsRate: Record<Platform, number> = { YouTube: 8, TikTok: 3, Instagram: 4 }
 
-function aggregate(platform: Platform) {
+function aggregate(platform: Platform, platformAccounts: { platform: Platform; followers: number; views30d: number; posts30d: number; engagement: number }[]) {
   const accounts = platformAccounts.filter((a) => a.platform === platform)
   const followers = accounts.reduce((t, a) => t + a.followers, 0)
   const views = accounts.reduce((t, a) => t + a.views30d, 0)
@@ -19,10 +19,16 @@ function aggregate(platform: Platform) {
 }
 
 export function ContentOverviewPage() {
-  const stats = platforms.map((p) => ({ platform: p, ...aggregate(p) }))
+  const platformAccounts = useContentStore((s) => s.accounts)
+  const storeTrend = useContentStore((s) => s.trend)
+  const stats = platforms.map((p) => ({ platform: p, ...aggregate(p, platformAccounts) }))
   const totalViews = stats.reduce((t, s) => t + s.views, 0)
 
-  const trendData = contentAnalytics.map((d) => {
+  const baseTrend = storeTrend.long.map((point, index) => ({
+    label: point.label,
+    views: point.views + (storeTrend.short[index]?.views ?? 0),
+  }))
+  const trendData = baseTrend.map((d) => {
     const share = (p: Platform) => (stats.find((s) => s.platform === p)?.views ?? 0) / (totalViews || 1)
     return {
       label: d.label,

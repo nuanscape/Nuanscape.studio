@@ -47,7 +47,7 @@ export function FinanceGoalsPage() {
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.8fr_1fr]">
         <div className="space-y-3">
           {goals.map((goal) => {
-            const progress = Math.min(100, (goal.saved / goal.target) * 100)
+            const progress = goal.target > 0 ? Math.min(100, (goal.saved / goal.target) * 100) : 0
             const remaining = Math.max(0, goal.target - goal.saved)
             const days = Math.ceil((new Date(goal.deadline).getTime() - Date.now()) / 86_400_000)
             const months = Math.max(1, Math.ceil(days / 30))
@@ -92,6 +92,11 @@ export function FinanceGoalsPage() {
               </Card>
             )
           })}
+          {goals.length === 0 ? (
+            <Card className="p-8 text-center">
+              <p className="text-[11px] text-text-muted">Belum ada goal. Tambahkan goal pertamamu.</p>
+            </Card>
+          ) : null}
           <button
             onClick={() => setCreateOpen(true)}
             className="ring-focus flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong bg-white/[0.01] py-5 text-[11px] font-medium text-text-muted transition-colors hover:border-primary/40 hover:bg-primary/[0.03] hover:text-primary"

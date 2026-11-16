@@ -6,13 +6,15 @@ import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { useSellerStore } from '@/stores/seller-store'
-import { productMargin, shopMetrics } from '@/lib/metrics'
-import { shopInsights } from '@/data/mock'
+import { productMargin } from '@/lib/metrics'
+import { buildSellerLedger, summarizeLedger } from '@/lib/seller-ledger'
+import type { AIInsight } from '@/types'
 import { cn, formatIDR, formatPercent } from '@/lib/utils'
 
 export function SellerIntelligencePage() {
-  const { products, fees } = useSellerStore()
-    const metrics = shopMetrics(products, fees)
+  const { products, orders, connections, vouchers, flashSales, ads, fees } = useSellerStore()
+  const ledger = buildSellerLedger({ orders, products, connections, vouchers, flashSales, ads, fees })
+  const metrics = summarizeLedger(ledger)
 
   const ranked = [...products]
     .map((p) => {
@@ -30,6 +32,38 @@ export function SellerIntelligencePage() {
   const atRisk = products.filter((p) => p.stock === 0 || (p.stock > 0 && p.stock <= p.minStock))
   const profitContrib = ranked.reduce((a, r) => a + Math.max(0, r.net), 0)
   const maxNet = Math.max(...ranked.map((r) => Math.abs(r.net)), 1)
+
+  const insights: AIInsight[] = []
+  if (atRisk.length > 0) {
+    insights.push({
+      id: 'intel-risk',
+      title: `${atRisk.length} produk berisiko stok`,
+      detail: atRisk.map((p) => `${p.name} (${p.stock}/${p.minStock})`).join(', '),
+      why: 'Diambil dari produk tersimpan yang habis atau di bawah stok minimum.',
+      tone: 'danger',
+      action: 'Restock',
+    })
+  }
+  if (best) {
+    insights.push({
+      id: 'intel-best',
+      title: `${best.p.name} kontribusi terbesar`,
+      detail: `${formatIDR(Math.round(best.net))} net dari ${best.p.sold} unit terjual.`,
+      why: 'Dihitung dari harga jual, HPP, fee, dan unit terjual pada produk tersimpan.',
+      tone: best.net >= 0 ? 'positive' : 'warning',
+      action: 'Lihat produk',
+    })
+  }
+  if (worst && worst !== best) {
+    insights.push({
+      id: 'intel-worst',
+      title: `${worst.p.name} perlu evaluasi`,
+      detail: `Margin ${formatPercent(worst.marginPct)} dengan ${worst.p.sold} unit terjual.`,
+      why: 'Dihitung dari harga jual, HPP, dan fee pada produk tersimpan.',
+      tone: worst.net < 0 ? 'danger' : 'neutral',
+      action: 'Tinjau harga',
+    })
+  }
 
   return (
     <div>
@@ -49,7 +83,7 @@ export function SellerIntelligencePage() {
       />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Net profit 30D" value={formatIDR(Math.round(metrics.netProfit))} deltaLabel={`margin ${formatPercent(metrics.margin)}`} icon={<Wallet />} tone={metrics.netProfit >= 0 ? 'positive' : 'danger'} accent="orange" />
+        <MetricCard label="Net profit 30D" value={formatIDR(Math.round(metrics.net))} deltaLabel={`margin ${formatPercent(metrics.margin)}`} icon={<Wallet />} tone={metrics.net >= 0 ? 'positive' : 'danger'} accent="orange" />
         <MetricCard label="Produk terbaik" value={best ? best.p.name.split(' ').slice(0, 2).join(' ') : '-'} deltaLabel={best ? `${formatIDR(best.net, { compact: true })} net` : 'belum ada'} icon={<Flame />} accent="yellow" />
         <MetricCard label="Kontribusi profit" value={best ? formatPercent(profitContrib ? (best.net / profitContrib) * 100 : 0) : '-'} deltaLabel="dari produk teratas" icon={<TrendingUp />} tone="positive" accent="teal" />
         <MetricCard label="Stok berisiko" value={`${atRisk.length} produk`} deltaLabel="habis atau di bawah minimum" icon={<Boxes />} tone={atRisk.length ? 'warning' : 'positive'} accent="pink" />
@@ -77,6 +111,9 @@ export function SellerIntelligencePage() {
                 </div>
               </div>
             ))}
+            {ranked.length === 0 ? (
+              <p className="py-8 text-center text-[11px] text-text-muted">Belum ada produk untuk dihitung.</p>
+            ) : null}
           </div>
           <p className="mt-3 text-[10px] leading-relaxed text-text-muted">
             Estimasi memakai unit terjual × harga jual. Tidak memperhitungkan retur per produk dan
@@ -85,11 +122,16 @@ export function SellerIntelligencePage() {
         </Card>
 
         <Card className="p-5">
-          <SectionHeader title="Sinyal keputusan" description="Dari data lokal dan insight demo" />
+          <SectionHeader title="Sinyal keputusan" description="Dihitung dari produk dan pesanan tersimpan" />
           <div className="space-y-2.5">
-            {shopInsights.slice(0, 4).map((insight) => (
+            {insights.map((insight) => (
               <InsightCard key={insight.id} {...insight} onAction={() => window.location.assign('/app/monitor')} />
             ))}
+            {insights.length === 0 ? (
+              <p className="py-8 text-center text-[11px] text-text-muted">
+                Belum ada sinyal. Tambahkan produk untuk mulai dianalisis.
+              </p>
+            ) : null}
           </div>
         </Card>
       </div>
@@ -142,6 +184,13 @@ export function SellerIntelligencePage() {
                 </TR>
               )
             })}
+            {ranked.length === 0 ? (
+              <TR>
+                <TD colSpan={5} className="py-8 text-center text-[11px] text-text-muted">
+                  Belum ada produk.
+                </TD>
+              </TR>
+            ) : null}
           </TBody>
         </Table>
         <div className="border-t border-line px-5 py-3">

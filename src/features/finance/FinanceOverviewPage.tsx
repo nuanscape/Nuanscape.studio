@@ -24,10 +24,29 @@ import {
   categoryTotals,
   financeSummary,
 } from '@/lib/metrics'
-import { financeInsights, expenseCategories, financeSeries } from '@/data/mock'
+import type { AIInsight, Transaction } from '@/types'
 import { cn, formatIDR, formatPercent } from '@/lib/utils'
 
 type Range = '7d' | '30d' | '3m' | '6m' | '1y'
+
+const expensePalette = ['#F0512B', '#FFD166', '#FF9E7D', '#6DBBFF', '#B4B4B4', '#FFE9A3', '#7C8CF8']
+
+function monthlySeries(transactions: Transaction[], months: number) {
+  const now = new Date()
+  return Array.from({ length: months }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (months - 1 - i), 1)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const monthTx = transactions.filter((t) => t.date.slice(0, 7) === key)
+    const income = monthTx.filter((t) => t.type === 'income').reduce((a, t) => a + t.amount, 0)
+    const expense = monthTx.filter((t) => t.type === 'expense').reduce((a, t) => a + t.amount, 0)
+    return {
+      label: d.toLocaleDateString('id-ID', { month: 'short' }),
+      income,
+      expense,
+      net: income - expense,
+    }
+  })
+}
 
 export function FinanceOverviewPage() {
   const { transactions, assets, liabilities, budgets } = useFinanceStore()
@@ -37,11 +56,17 @@ export function FinanceOverviewPage() {
   const summary = financeSummary(transactions, assets, liabilities)
   const budgetInfo = budgetSummary(budgets)
   const incomeTotals = categoryTotals(transactions, 'income')
+  const expenseTotals = categoryTotals(transactions, 'expense')
+  const expenseDistribution = expenseTotals.map((c, i) => ({
+    ...c,
+    color: expensePalette[i % expensePalette.length],
+  }))
+  const hasTransactions = transactions.length > 0
 
   const chartData = React.useMemo(() => {
     if (range === '3m' || range === '6m' || range === '1y') {
       const months = range === '3m' ? 3 : range === '6m' ? 6 : 12
-      return financeSeries.slice(-months)
+      return monthlySeries(transactions, months)
     }
     const days = range === '7d' ? 7 : 30
     const buckets: Record<string, { label: string; income: number; expense: number; net: number }> = {}
@@ -67,7 +92,50 @@ export function FinanceOverviewPage() {
     return Object.values(buckets)
   }, [range, transactions])
 
-  const score = Math.min(96, Math.max(35, Math.round(summary.savingsRate * 1.55 + 32)))
+  const score = hasTransactions
+    ? Math.min(96, Math.max(35, Math.round(summary.savingsRate * 1.55 + 32)))
+    : 0
+  const budgetLeader = [...budgets].sort(
+    (a, b) => (b.limit ? b.spent / b.limit : 0) - (a.limit ? a.spent / a.limit : 0),
+  )[0]
+  const budgetLeaderUsage = budgetLeader && budgetLeader.limit ? (budgetLeader.spent / budgetLeader.limit) * 100 : 0
+  const topExpense = expenseTotals[0]
+  const insights: AIInsight[] = []
+  if (hasTransactions && summary.income > 0) {
+    insights.push({
+      id: 'savings-rate',
+      title:
+        summary.savingsRate >= 30
+          ? 'Savings rate di atas target'
+          : summary.savingsRate >= 0
+            ? 'Savings rate di bawah target 30%'
+            : 'Arus kas negatif',
+      detail: `Savings rate ${formatPercent(summary.savingsRate)} dari ${formatIDR(summary.income, { compact: true })} pemasukan tercatat.`,
+      why: 'Dihitung dari seluruh transaksi pemasukan dan pengeluaran yang tersimpan.',
+      tone: summary.savingsRate >= 30 ? 'positive' : summary.savingsRate >= 0 ? 'warning' : 'danger',
+      action: 'Lihat laporan',
+    })
+  }
+  if (budgetLeader) {
+    insights.push({
+      id: 'budget-usage',
+      title: `Budget ${budgetLeader.category} terpakai ${Math.round(budgetLeaderUsage)}%`,
+      detail: `${formatIDR(budgetLeader.spent, { compact: true })} dari limit ${formatIDR(budgetLeader.limit, { compact: true })}.`,
+      why: 'Pemakaian dihitung dari data budget yang tersimpan, bukan estimasi.',
+      tone: budgetLeaderUsage > 100 ? 'danger' : budgetLeaderUsage > 85 ? 'warning' : 'neutral',
+      action: 'Kelola budget',
+    })
+  }
+  if (topExpense && summary.expense > 0) {
+    insights.push({
+      id: 'top-expense',
+      title: `${topExpense.name} jadi pengeluaran terbesar`,
+      detail: `${formatIDR(topExpense.value, { compact: true })} atau ${formatPercent((topExpense.value / summary.expense) * 100)} dari total pengeluaran.`,
+      why: 'Diagregasi dari kategori pada transaksi pengeluaran yang tersimpan.',
+      tone: 'neutral',
+      action: 'Lihat pengeluaran',
+    })
+  }
 
   return (
     <div>
@@ -90,33 +158,29 @@ export function FinanceOverviewPage() {
         <MetricCard
           label="Total balance"
           value={formatIDR(summary.balance)}
-          delta={8.2}
-          deltaLabel="vs bulan lalu"
+          deltaLabel={`${assets.length} aset · ${liabilities.length} liabilitas`}
           icon={<Wallet />}
           accent="yellow"
         />
         <MetricCard
           label="Total income"
           value={formatIDR(summary.income)}
-          delta={12.4}
-          deltaLabel="dari 8 sumber"
+          deltaLabel={`${transactions.filter((t) => t.type === 'income').length} transaksi`}
           icon={<TrendingUp />}
           accent="teal"
         />
         <MetricCard
           label="Total expenses"
           value={formatIDR(summary.expense)}
-          delta={-12}
-          deltaLabel="perlu perhatian"
+          deltaLabel={`${transactions.filter((t) => t.type === 'expense').length} transaksi`}
           icon={<TrendingDown />}
           tone="warning"
           accent="orange"
         />
         <MetricCard
           label="Savings rate"
-          value={formatPercent(summary.savingsRate)}
-          delta={6.4}
-          deltaLabel="di atas target 30%"
+          value={summary.income > 0 ? formatPercent(summary.savingsRate) : '—'}
+          deltaLabel={summary.income > 0 ? 'dari total pemasukan' : 'belum ada pemasukan'}
           icon={<Scale />}
           tone="positive"
           accent="pink"
@@ -155,19 +219,25 @@ export function FinanceOverviewPage() {
                 <span className="flex items-center gap-1.5 text-primary"><span className="size-1.5 rounded-full bg-primary" /> Income</span>
                 <span className="flex items-center gap-1.5 text-danger"><span className="size-1.5 rounded-full bg-danger" /> Expense</span>
               </div>
-              <Badge tone="primary" className="ml-auto">
-                <TrendingUp /> {formatPercent(12.4, true)} MoM
+              <Badge tone="outline" className="ml-auto">
+                {transactions.length} transaksi
               </Badge>
             </div>
-            <AreaTrendChart
-              data={chartData.map((d) => ({ label: d.label, income: d.income, expense: d.expense }))}
-              xKey="label"
-              series={[
-                { key: 'income', label: 'Income', color: '#F5D64B' },
-                { key: 'expense', label: 'Expense', color: '#F0512B' },
-              ]}
-              height={260}
-            />
+            {hasTransactions ? (
+              <AreaTrendChart
+                data={chartData.map((d) => ({ label: d.label, income: d.income, expense: d.expense }))}
+                xKey="label"
+                series={[
+                  { key: 'income', label: 'Income', color: '#F5D64B' },
+                  { key: 'expense', label: 'Expense', color: '#F0512B' },
+                ]}
+                height={260}
+              />
+            ) : (
+              <p className="py-16 text-center text-[11px] text-text-muted">
+                Belum ada transaksi. Tambahkan transaksi untuk melihat arus kas.
+              </p>
+            )}
           </div>
         </Card>
 
@@ -177,18 +247,24 @@ export function FinanceOverviewPage() {
               <h2 className="text-[14px] font-semibold tracking-tight text-text-primary">Financial health</h2>
               <p className="mt-0.5 text-[11px] text-text-muted">Dihitung dari savings rate, budget, dan aset.</p>
             </div>
-            <Badge tone={score >= 75 ? 'primary' : score >= 55 ? 'warning' : 'danger'}>
-              {score >= 75 ? 'Sehat' : score >= 55 ? 'Cukup' : 'Perlu perhatian'}
+            <Badge tone={!hasTransactions ? 'outline' : score >= 75 ? 'primary' : score >= 55 ? 'warning' : 'danger'}>
+              {!hasTransactions ? 'Belum ada data' : score >= 75 ? 'Sehat' : score >= 55 ? 'Cukup' : 'Perlu perhatian'}
             </Badge>
           </div>
           <div className="my-4 flex justify-center">
-            <RadialScore value={score} label="health score" />
+            {hasTransactions ? (
+              <RadialScore value={score} label="health score" />
+            ) : (
+              <p className="py-10 text-center text-[11px] text-text-muted">
+                Health score dihitung setelah ada transaksi tercatat.
+              </p>
+            )}
           </div>
           <div className="space-y-3">
             {[
               { label: 'Savings rate', value: summary.savingsRate, target: 'Target 30%', tone: 'primary' as const },
               { label: 'Budget usage', value: budgetInfo.usage, target: `${formatIDR(budgetInfo.remaining, { compact: true })} tersisa`, tone: budgetInfo.usage > 85 ? 'warning' as const : 'primary' as const },
-              { label: 'Debt ratio', value: (summary.liabilityTotal / summary.assetTotal) * 100, target: `${formatIDR(summary.liabilityTotal, { compact: true })} liabilitas`, tone: 'info' as const },
+              { label: 'Debt ratio', value: summary.assetTotal ? (summary.liabilityTotal / summary.assetTotal) * 100 : 0, target: `${formatIDR(summary.liabilityTotal, { compact: true })} liabilitas`, tone: 'info' as const },
             ].map((item) => (
               <div key={item.label}>
                 <div className="flex items-center justify-between text-[11px]">
@@ -212,16 +288,24 @@ export function FinanceOverviewPage() {
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
         <Card className="p-5">
           <SectionHeader title="Expense distribution" description="30 hari terakhir" />
-          <DonutChart data={expenseCategories} height={190} centerValue={formatIDR(summary.expense, { compact: true })} centerLabel="total expense" />
-          <div className="mt-3 space-y-2">
-            {expenseCategories.slice(0, 4).map((c) => (
-              <div key={c.name} className="flex items-center gap-2 text-[11px]">
-                <span className="size-2 rounded-full" style={{ backgroundColor: c.color }} />
-                <span className="flex-1 text-text-secondary">{c.name}</span>
-                <span className="num text-text-primary">{formatIDR(c.value, { compact: true })}</span>
+          {expenseDistribution.length > 0 ? (
+            <>
+              <DonutChart data={expenseDistribution} height={190} centerValue={formatIDR(summary.expense, { compact: true })} centerLabel="total expense" />
+              <div className="mt-3 space-y-2">
+                {expenseDistribution.slice(0, 4).map((c) => (
+                  <div key={c.name} className="flex items-center gap-2 text-[11px]">
+                    <span className="size-2 rounded-full" style={{ backgroundColor: c.color }} />
+                    <span className="flex-1 text-text-secondary">{c.name}</span>
+                    <span className="num text-text-primary">{formatIDR(c.value, { compact: true })}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            </>
+          ) : (
+            <p className="py-16 text-center text-[11px] text-text-muted">
+              Belum ada transaksi pengeluaran.
+            </p>
+          )}
         </Card>
 
         <Card className="p-5">
@@ -232,7 +316,7 @@ export function FinanceOverviewPage() {
           />
           <div className="space-y-3.5">
             {budgets.slice(0, 4).map((budget) => {
-              const usage = (budget.spent / budget.limit) * 100
+              const usage = budget.limit ? (budget.spent / budget.limit) * 100 : 0
               return (
                 <div key={budget.id}>
                   <div className="flex items-center justify-between text-[11px]">
@@ -249,9 +333,14 @@ export function FinanceOverviewPage() {
                 </div>
               )
             })}
+            {budgets.length === 0 ? (
+              <p className="py-8 text-center text-[11px] text-text-muted">Belum ada budget.</p>
+            ) : null}
           </div>
           <div className="mt-4 rounded-lg border border-line bg-white/[0.02] p-2.5 text-[10px] leading-relaxed text-text-muted">
-            Marketing mendekati limit. AI menyarankan realokasi dari budget hiburan yang masih 75% tersisa.
+            {budgetLeader
+              ? `${budgetLeader.category} memakai ${Math.round(budgetLeaderUsage)}% dari limitnya. Angka dihitung dari budget tersimpan.`
+              : 'Tambahkan budget kategori untuk melihat pemakaian dan sisa limit.'}
           </div>
         </Card>
 
@@ -262,9 +351,14 @@ export function FinanceOverviewPage() {
             action={<button onClick={() => window.location.assign('/app/monitor')} className="text-[10px] text-primary hover:text-primary-soft">Tanya Nuanscape AI</button>}
           />
           <div className="space-y-3">
-            {financeInsights.map((insight) => (
+            {insights.map((insight) => (
               <InsightCard key={insight.id} {...insight} onAction={() => window.location.assign('/app/monitor')} />
             ))}
+            {insights.length === 0 ? (
+              <p className="py-8 text-center text-[11px] text-text-muted">
+                Belum ada insight. Catat transaksi dan budget untuk mulai.
+              </p>
+            ) : null}
           </div>
         </Card>
       </div>
@@ -289,6 +383,7 @@ export function FinanceOverviewPage() {
                     <span className="num shrink-0 text-text-secondary">{formatIDR(a.value, { compact: true })}</span>
                   </div>
                 ))}
+                {assets.length === 0 ? <p className="text-[10px] text-text-muted">Belum ada aset tercatat.</p> : null}
               </div>
             </div>
             <div>
@@ -303,6 +398,7 @@ export function FinanceOverviewPage() {
                     <span className="num shrink-0 text-text-secondary">{formatIDR(l.value, { compact: true })}</span>
                   </div>
                 ))}
+                {liabilities.length === 0 ? <p className="text-[10px] text-text-muted">Tidak ada liabilitas tercatat.</p> : null}
               </div>
             </div>
           </div>
@@ -312,7 +408,7 @@ export function FinanceOverviewPage() {
           <SectionHeader title="Income sources" description="Kontribusi pemasukan" />
           <div className="space-y-3">
             {incomeTotals.map((source) => {
-              const share = (source.value / summary.income) * 100
+              const share = summary.income > 0 ? (source.value / summary.income) * 100 : 0
               return (
                 <div key={source.name}>
                   <div className="flex items-center justify-between text-[11px]">
@@ -323,10 +419,12 @@ export function FinanceOverviewPage() {
                 </div>
               )
             })}
+            {incomeTotals.length === 0 ? (
+              <p className="py-8 text-center text-[11px] text-text-muted">Belum ada pemasukan tercatat.</p>
+            ) : null}
           </div>
           <p className="mt-4 text-[10px] leading-relaxed text-text-muted">
-            Marketplace dan business income menyumbang lebih dari setengah total pemasukan. Uang
-            pribadi dan bisnis tetap terpisah.
+            Porsi dihitung dari kategori transaksi pemasukan yang tersimpan.
           </p>
         </Card>
       </div>

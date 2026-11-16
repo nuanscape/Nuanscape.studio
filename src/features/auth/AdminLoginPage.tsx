@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowRight, LockKeyhole, Mail, Radar, ShieldCheck, UserRound } from 'lucide-react'
 import { useAuthStore, useToastStore } from '@/stores/app-store'
+import { api } from '@/lib/api-client'
 import { IosIcon } from '@/components/ui/ios-icon'
 import { BackgroundVideo } from '@/components/ui/background-video'
 import { cn } from '@/lib/utils'
@@ -13,6 +14,29 @@ const TABS: { id: Mode; label: string }[] = [
   { id: 'login', label: 'Masuk' },
   { id: 'register', label: 'Daftar' },
 ]
+
+function GoogleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4 shrink-0">
+      <path
+        fill="#4285F4"
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.21 3.31v2.75h3.57c2.08-1.92 3.28-4.74 3.28-8.07Z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.75c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23Z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.84 14.12a6.6 6.6 0 0 1 0-4.24V7.04H2.18a11 11 0 0 0 0 9.92l3.66-2.84Z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.04l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38Z"
+      />
+    </svg>
+  )
+}
 
 function Reveal({ open, children }: { open: boolean; children: React.ReactNode }) {
   return (
@@ -39,8 +63,9 @@ function Reveal({ open, children }: { open: boolean; children: React.ReactNode }
 export function AdminLoginPage() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const next = params.get('next') || '/app/monitor'
-  const { session, login, register } = useAuthStore()
+  const nextParam = params.get('next') || '/app/monitor'
+  const next = nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '/app/monitor'
+  const { session, login, register, loginWithGoogle } = useAuthStore()
   const { push } = useToastStore()
 
   const [mode, setMode] = React.useState<Mode>('login')
@@ -48,10 +73,52 @@ export function AdminLoginPage() {
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [error, setError] = React.useState('')
+  const [googleBusy, setGoogleBusy] = React.useState(false)
+  const googleHandled = React.useRef(false)
 
   React.useEffect(() => {
-    if (session) navigate(next, { replace: true })
-  }, [session, navigate, next])
+    if (session && !params.get('ticket')) navigate(next, { replace: true })
+  }, [session, navigate, next, params])
+
+  React.useEffect(() => {
+    const google = params.get('google')
+    if (google === 'error') {
+      setError(params.get('reason') || 'Login Google gagal. Coba lagi.')
+      return
+    }
+
+    const ticket = params.get('ticket')
+    if (google !== 'success' || !ticket || googleHandled.current) return
+    googleHandled.current = true
+    setGoogleBusy(true)
+
+    void (async () => {
+      const result = await loginWithGoogle(ticket)
+      if (!result.ok) {
+        setError(result.error)
+        setGoogleBusy(false)
+        return
+      }
+      push({
+        title: 'Berhasil masuk dengan Google',
+        description: 'Dashboard Nuanscape siap digunakan.',
+        tone: 'success',
+      })
+      navigate(next, { replace: true })
+    })()
+  }, [params, loginWithGoogle, push, navigate, next])
+
+  const startGoogle = async () => {
+    setError('')
+    setGoogleBusy(true)
+    try {
+      const { url } = await api.auth.googleUrl({ next })
+      window.location.assign(url)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Tidak bisa memulai login Google.')
+      setGoogleBusy(false)
+    }
+  }
 
   const switchMode = (value: Mode) => {
     setMode(value)
@@ -59,12 +126,12 @@ export function AdminLoginPage() {
     setPassword('')
   }
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
     const result =
-      mode === 'login' ? login({ email, password }) : register({ name, email, password })
+      mode === 'login' ? await login({ email, password }) : await register({ name, email, password })
 
     if (!result.ok) {
       setError(result.error)
@@ -298,9 +365,35 @@ export function AdminLoginPage() {
                 </span>
               </button>
 
+              <div className="my-4 flex items-center gap-3">
+                <span className="h-px flex-1 bg-white/10" />
+                <span className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#E1E0CC]/40">
+                  atau
+                </span>
+                <span className="h-px flex-1 bg-white/10" />
+              </div>
+
+              <button
+                type="button"
+                onClick={startGoogle}
+                disabled={googleBusy}
+                className="inline-flex h-11 w-full items-center justify-center gap-3 rounded-full border border-white/15 bg-white/[0.06] text-sm font-medium text-[#F4F3EA] transition-colors hover:border-white/30 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {googleBusy ? (
+                  <span className="size-4 animate-spin rounded-full border-2 border-[#E1E0CC]/30 border-t-[#E1E0CC]" />
+                ) : (
+                  <GoogleIcon />
+                )}
+                {googleBusy
+                  ? 'Membuka Google...'
+                  : mode === 'login'
+                    ? 'Masuk dengan Google'
+                    : 'Daftar dengan Google'}
+              </button>
+
               <div className="mt-5 flex items-start gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-[11px] leading-relaxed text-[#E1E0CC]/50">
                 <ShieldCheck className="mt-0.5 size-3.5 shrink-0 text-[#F5D64B]/80" />
-                <span>Sesi akun tersimpan sampai kamu keluar. Setelah keluar, masuk lagi dengan akun studio.</span>
+                <span>Sesi akun tersimpan sampai kamu keluar. Login Google otomatis membuat akun bila email belum terdaftar.</span>
               </div>
             </form>
           </motion.div>

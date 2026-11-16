@@ -1,9 +1,11 @@
-﻿import { Bot, CalendarDays, CheckCircle2, Lightbulb, Play, ShieldCheck, Zap } from 'lucide-react'
+﻿import * as React from 'react'
+import { Bot, CalendarDays, CheckCircle2, Lightbulb, Play, ShieldCheck, Zap } from 'lucide-react'
 import { PageHeader, SectionHeader, MetricCard } from '@/components/shared/page-header'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { contentInsights } from '@/data/mock'
+import { api } from '@/lib/api-client'
+import type { AIInsight } from '@/types'
 import { useAutomationStore } from '@/stores/automation-store'
 import { useContentStore } from '@/stores/content-store'
 import { useToastStore } from '@/stores/app-store'
@@ -17,6 +19,36 @@ export function ContentAgentReportPage() {
   const aiEnergy = useContentStore((s) => s.aiEnergy)
   const aiEnergyMax = useContentStore((s) => s.aiEnergyMax)
   const { push } = useToastStore()
+
+  const [recommendations, setRecommendations] = React.useState<AIInsight[]>([])
+
+  React.useEffect(() => {
+    let alive = true
+    api.content
+      .getAgentReport()
+      .then((res) => {
+        if (!alive) return
+        const report = res as {
+          recommendations?: { id: string; title: string; detail: string; why?: string; action?: string }[]
+        }
+        if (Array.isArray(report.recommendations) && report.recommendations.length > 0) {
+          setRecommendations(
+            report.recommendations.map((item) => ({
+              id: item.id,
+              title: item.title,
+              detail: item.detail,
+              why: item.why ?? 'Berdasarkan data konten tersimpan.',
+              tone: 'neutral' as const,
+              ...(item.action ? { action: item.action } : {}),
+            })),
+          )
+        }
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [])
 
   const automations = useAutomationStore((s) => s.items)
   const approve = useAutomationStore((s) => s.approve)
@@ -232,21 +264,27 @@ export function ContentAgentReportPage() {
 
       <Card className="mt-4 p-5">
         <SectionHeader title="Saran dari Bambang" description="Rekomendasi untuk meningkatkan performa konten" />
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {contentInsights.map((insight) => (
-            <div key={insight.id} className="rounded-xl border border-line bg-white/[0.02] p-4">
-              <div className="flex items-start gap-2">
-                <Lightbulb className="mt-0.5 size-4 shrink-0 text-primary" />
-                <div>
-                  <p className="text-[12px] font-semibold text-text-primary">{insight.title}</p>
-                  <p className="mt-1 text-[11px] leading-relaxed text-text-secondary">{insight.detail}</p>
-                  <p className="mt-2 text-[10px] text-text-muted">Alasan: {insight.why}</p>
-                  {insight.action ? <Badge tone="info" className="mt-2 text-[9px]">{insight.action}</Badge> : null}
+        {recommendations.length ? (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {recommendations.map((insight) => (
+              <div key={insight.id} className="rounded-xl border border-line bg-white/[0.02] p-4">
+                <div className="flex items-start gap-2">
+                  <Lightbulb className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <div>
+                    <p className="text-[12px] font-semibold text-text-primary">{insight.title}</p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-text-secondary">{insight.detail}</p>
+                    <p className="mt-2 text-[10px] text-text-muted">Alasan: {insight.why}</p>
+                    {insight.action ? <Badge tone="info" className="mt-2 text-[9px]">{insight.action}</Badge> : null}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-line px-4 py-6 text-center text-[11px] text-text-muted">
+            Belum ada rekomendasi dari backend.
+          </div>
+        )}
       </Card>
     </div>
   )

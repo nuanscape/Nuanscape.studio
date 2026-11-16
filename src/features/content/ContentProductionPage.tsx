@@ -7,10 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Input, Select } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import { useContentStore } from '@/stores/content-store'
+import { api, type YouTubeResearchResult } from '@/lib/api-client'
 import { useToastStore } from '@/stores/app-store'
-import { platformAccounts } from '@/data/mock'
 import { AccountPicker } from '@/features/content/components/account-picker'
-import { cn, downloadText, uid } from '@/lib/utils'
+import { cn, downloadText, formatNumber, formatPercent, uid } from '@/lib/utils'
 import type { Platform } from '@/types'
 import {
   ArrowLeft,
@@ -21,6 +21,7 @@ import {
   Clapperboard,
   Clock3,
   Download,
+  ExternalLink,
   FileText,
   Film,
   Gauge,
@@ -36,7 +37,6 @@ import {
   Save,
   Search,
   ShieldAlert,
-  Sparkles,
   Trash2,
   Wand2,
   type LucideIcon,
@@ -45,6 +45,16 @@ import {
 type StepKey = 'type' | 'account' | 'research' | 'brief' | 'script' | 'scenes' | 'production' | 'generate' | 'result'
 type ContentType = 'music' | 'storytelling' | 'konspirasi'
 type ClaimType = 'Fakta' | 'Dugaan' | 'Spekulasi'
+
+interface IdeaOption {
+  id: string
+  title: string
+  hook: string
+  angle: string
+  thumbnail?: string
+  reference?: string
+  score: number
+}
 
 interface StyleOption {
   id: string
@@ -97,6 +107,14 @@ const types: { id: ContentType; label: string; desc: string; icon: LucideIcon }[
   { id: 'konspirasi', label: 'Konspirasi', desc: 'Bahasan misteri dan teori konspirasi', icon: Search },
 ]
 
+const designThemes: StyleOption[] = [
+  { id: 'cinematic', label: 'Cinematic', desc: 'Film still sinematik, cahaya dramatis, detail tajam.', accent: '#93C5FD' },
+  { id: 'pixel', label: 'Pixel art', desc: '16-bit retro, tepi pixel tajam, palet terbatas.', accent: '#A3E635' },
+  { id: 'anime', label: 'Anime', desc: 'Cel-shaded, garis bersih, warna vivid.', accent: '#F472B6' },
+  { id: 'clay', label: 'Clay', desc: 'Claymation, tekstur tanah liat, stop-motion.', accent: '#FDBA74' },
+  { id: '3d', label: '3D render', desc: 'CGI bersih, global illumination lembut.', accent: '#C4B5FD' },
+]
+
 const scriptSteps: StepDef[] = [
   { key: 'account', label: 'Pilih akun' },
   { key: 'type', label: 'Pilih tipe' },
@@ -127,9 +145,9 @@ const nicheConfigs: Record<ContentType, NicheConfig> = {
     icon: Music,
     needsScript: false,
     pageDescription: 'Riset audio, atur brief, pilih visual dan mood, lalu render tanpa script cerita.',
-    flowSummary: 'Pilih akun - pilih tipe - riset audio - brief audio - visual & audio - render',
+    flowSummary: 'Pilih akun - pilih tipe - riset audio - brief audio - visual & audio - generate thumbnail + loop',
     stepLabel: 'Sound & visual',
-    stepHint: 'Tentukan artwork, visualizer, dan mood audio sebelum render.',
+    stepHint: 'Tentukan artwork, durasi loop, dan mood audio sebelum render.',
     scriptTitle: 'Brief audio',
     scriptHint: 'Tidak perlu script cerita. Cukup tentukan arah audio dan visual.',
     sceneTitle: '',
@@ -149,9 +167,8 @@ const nicheConfigs: Record<ContentType, NicheConfig> = {
       { id: 'neon', label: 'Neon equalizer', desc: 'Visual tegas dengan aksen equalizer neon.', accent: '#5EEAD4' },
     ],
     animationStyles: [
-      { id: 'slow-zoom', label: 'Slow zoom', desc: 'Pergerakan halus untuk sesi fokus panjang.' },
-      { id: 'audio-reactive', label: 'Audio reactive', desc: 'Visualizer bergerak mengikuti beat.' },
-      { id: 'loop-motion', label: 'Loop motion', desc: 'Animasi mulus yang cocok untuk short-form.' },
+      { id: 'slow-zoom', label: 'Slow zoom', desc: 'Zoom sinusoid mulus untuk sesi fokus panjang.' },
+      { id: 'loop-motion', label: 'Loop motion', desc: 'Pan dan zoom lembut yang kembali ke frame awal.' },
     ],
     musicStyles: [
       { id: 'lofi', label: 'Lofi beats', desc: 'Beat santai, cocok untuk kerja dan belajar.' },
@@ -159,11 +176,17 @@ const nicheConfigs: Record<ContentType, NicheConfig> = {
       { id: 'jazzhop', label: 'Jazzhop', desc: 'Sample jazz ringan dengan groove lembut.' },
     ],
     checklist: [
-      'Durasi audio sesuai platform (long-form 1-3 jam, short 30-60 detik).',
-      'Beat utama muncul sebelum detik ke-3 untuk menahan perhatian.',
-      'Visualizer tidak menutupi judul dan artwork.',
+      'Durasi audio sesuai platform (long-form 1-2 jam, short 30-60 detik).',
+      'Thumbnail murni tanpa teks atau overlay agar loop tetap bersih.',
+      'Animasi AI dibuat near-static sesuai tema desain, lalu video di-loop lokal tanpa menambah animasi.',
     ],
-    phases: ['Menyusun beat', 'Mixing audio', 'Membangun visualizer', 'Render video'],
+    phases: [
+      'Menyusun beat',
+      'Generate gambar',
+      'Generate animasi AI',
+      'Mixing audio',
+      'Loop audio + video',
+    ],
   },
   storytelling: {
     id: 'storytelling',
@@ -241,26 +264,9 @@ const nicheConfigs: Record<ContentType, NicheConfig> = {
   },
 }
 
-const ideaSeeds: Record<ContentType, string[]> = {
-  music: [
-    'Lofi beats untuk fokus kerja malam hari',
-    'Playlist musik tenang untuk belajar 2 jam',
-    'Ambient music untuk relaksasi dan tidur',
-  ],
-  storytelling: [
-    'Kisah di balik perjuangan kreator pemula',
-    'Cerita inspiratif dari kegagalan menjadi sukses',
-    'Story telling: sehari membangun mimpi sendiri',
-  ],
-  konspirasi: [
-    'Misteri sinyal aneh yang belum terpecahkan',
-    'Teori konspirasi teknologi yang sering diperdebatkan',
-    'Fakta vs mitos: rahasia di balik peristiwa besar',
-  ],
-}
-
 const claimTypes: ClaimType[] = ['Fakta', 'Dugaan', 'Spekulasi']
 const audioLengths = ['30 detik', '60 detik', '1 jam', '2 jam']
+const musicTrackOptions = [1, 2, 3, 4, 5]
 const audioEnergies = ['Chill', 'Fokus', 'Upbeat']
 
 
@@ -270,9 +276,10 @@ function makePreviewSvg(
   thumb: StyleOption | undefined,
   animation: StyleOption | undefined,
   audio: StyleOption | undefined,
+  theme?: StyleOption,
 ) {
   const safe = (value: string) => value.replace(/[<>&"]/g, '')
-  const accent = thumb?.accent ?? '#F5D64B'
+  const accent = theme?.accent ?? thumb?.accent ?? '#F5D64B'
   const bars = Array.from({ length: 28 }, (_, i) => {
     const height = 24 + ((i * 37) % 96)
     return `<rect x="${320 + i * 23}" y="${528 - height / 2}" width="10" height="${height}" rx="5" fill="${accent}" opacity="${0.25 + (i % 5) * 0.12}"/>`
@@ -289,7 +296,7 @@ function makePreviewSvg(
   <rect x="52" y="52" width="1176" height="616" rx="30" fill="#101010" stroke="${accent}" stroke-opacity="0.32"/>
   <text x="90" y="132" fill="${accent}" font-size="22" font-family="Arial" font-weight="700" letter-spacing="4">${safe(type).toUpperCase()}</text>
   <text x="90" y="218" fill="#ffffff" font-size="44" font-family="Arial" font-weight="700">${safe(title).slice(0, 38)}</text>
-  <text x="90" y="266" fill="#9a9a9a" font-size="21" font-family="Arial">${safe(thumb?.label ?? 'Thumbnail')} - ${safe(animation?.label ?? 'Animasi')}</text>
+  <text x="90" y="266" fill="#9a9a9a" font-size="21" font-family="Arial">${safe(thumb?.label ?? 'Thumbnail')} - ${safe(animation?.label ?? 'Animasi')} - ${safe(theme?.label ?? 'Cinematic')}</text>
   ${decoration}
   <rect x="90" y="408" width="410" height="42" rx="21" fill="${accent}" fill-opacity="0.12"/>
   <text x="112" y="436" fill="${accent}" font-size="18" font-family="Arial">${safe(audio?.label ?? 'Music')}</text>
@@ -299,53 +306,15 @@ function makePreviewSvg(
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
 }
 
-function initialScript(type: ContentType, idea: string) {
-  if (type === 'storytelling') {
-    return `Hook: ${idea}.\n\nSemua berawal dari langkah kecil yang terasa biasa. Ada keraguan, ada kegagalan, dan ada momen ketika semuanya hampir berhenti.\n\nNamun satu keputusan mengubah arah cerita. Kreator ini mulai konsisten, belajar dari feedback, dan membangun karyanya sedikit demi sedikit.\n\nSampai akhirnya hasil itu datang. Bukan karena keberuntungan, tetapi karena cerita yang dijalani sampai selesai.`
-  }
-  return `Klaim: ${idea}.\n\nBukti yang beredar memperlihatkan pola yang sulit dijelaskan. Beberapa sumber menyebut kejadian ini sebagai kebetulan, sementara sumber lain melihat adanya hubungan yang sengaja disembunyikan.\n\nYang perlu dicatat, tidak semua potongan informasi punya kredibilitas yang sama. Ada fakta yang bisa diverifikasi, ada dugaan yang masih terbuka, dan ada spekulasi yang perlu diberi label jelas.\n\nKesimpulan tidak boleh melompat. Kita susun bukti, cek sumber, lalu biarkan penonton menilai sendiri.`
-}
-
-function defaultScenes(type: ContentType, idea: string, config: NicheConfig): SceneDraft[] {
-  const templates =
-    type === 'storytelling'
-      ? [
-          { title: 'Hook', narration: `${idea}. Momen ini terasa biasa, sampai satu detail mengubah segalanya.`, visual: 'Close-up wajah dan detail kecil yang jadi pemicu cerita.', duration: 6 },
-          { title: 'Konflik', narration: 'Keraguan muncul. Kegagalan demi kegagalan membuat langkah terasa sia-sia.', visual: 'Montase proses, catatan, dan layar yang penuh revisi.', duration: 11 },
-          { title: 'Resolusi', narration: 'Satu keputusan kecil membuka jalan. Cerita ini tidak selesai karena keberuntungan, tetapi karena terus dilanjutkan.', visual: 'Reveal hasil akhir dengan pencahayaan hangat.', duration: 8 },
-        ]
-      : [
-          { title: 'Klaim utama', narration: `Klaim: ${idea}.`, visual: 'Headline, potongan arsip, dan garis waktu awal.', duration: 7 },
-          { title: 'Bukti yang beredar', narration: 'Beberapa sumber memperlihatkan pola yang sama. Namun tidak semua bukti punya kredibilitas yang setara.', visual: 'Evidence board dengan sumber dan bagian yang disorot.', duration: 12 },
-          { title: 'Reveal & konteks', narration: 'Yang bisa disimpulkan adalah ini: ada fakta, ada dugaan, dan ada spekulasi yang masih terbuka.', visual: 'Reveal dokumen kunci, lalu tampilkan disclaimer dan konteks.', duration: 9 },
-        ]
-
-  return templates.map((scene, index) => ({
-    id: uid('scene'),
-    title: scene.title,
-    narration: scene.narration,
-    visual: scene.visual,
-    duration: scene.duration,
-    animation: config.animationStyles[index % config.animationStyles.length].id,
-    claimType: type === 'konspirasi' ? claimTypes[index % claimTypes.length] : undefined,
-    source: type === 'konspirasi' ? 'Sumber akan dilengkapi' : undefined,
-  }))
-}
-
 function buildScenesFromScript(script: string, type: ContentType, config: NicheConfig): SceneDraft[] {
   const paragraphs = script
     .split(/\n\s*\n/)
     .map((part) => part.trim())
     .filter(Boolean)
 
-  if (paragraphs.length < 2) {
-    return defaultScenes(type, script.split('\n')[0] || 'Ide konten', config).map((scene, index) => ({
-      ...scene,
-      narration: index === 0 ? script.trim() : scene.narration,
-    }))
-  }
+  const narrationParts = paragraphs.length >= 2 ? paragraphs.slice(0, 8) : [script.trim()]
 
-  return paragraphs.slice(0, 8).map((narration, index) => {
+  return narrationParts.map((narration, index) => {
     const firstLine = narration.split('\n')[0]
     const words = narration.trim().split(/\s+/).filter(Boolean).length
     return {
@@ -362,11 +331,11 @@ function buildScenesFromScript(script: string, type: ContentType, config: NicheC
 }
 
 export function ContentProductionPage() {
-  const addContent = useContentStore((s) => s.addContent)
   const consumeEnergy = useContentStore((s) => s.consumeEnergy)
   const addEnergy = useContentStore((s) => s.addEnergy)
   const aiEnergy = useContentStore((s) => s.aiEnergy)
   const aiEnergyMax = useContentStore((s) => s.aiEnergyMax)
+  const accounts = useContentStore((s) => s.accounts)
   const { push } = useToastStore()
 
   const [step, setStep] = React.useState<StepKey>('account')
@@ -374,8 +343,13 @@ export function ContentProductionPage() {
   const [accountId, setAccountId] = React.useState('')
   const [platform, setPlatform] = React.useState<Platform>('YouTube')
   const [selectedIdea, setSelectedIdea] = React.useState('')
-  const [ideas, setIdeas] = React.useState<string[]>([])
+  const [ideas, setIdeas] = React.useState<IdeaOption[]>([])
   const [researching, setResearching] = React.useState(false)
+  const [ytQuery, setYtQuery] = React.useState<string | null>(null)
+  const [ytResearch, setYtResearch] = React.useState<YouTubeResearchResult | null>(null)
+  const [ytLoading, setYtLoading] = React.useState(false)
+  const [ytError, setYtError] = React.useState<string | null>(null)
+  const [preparing, setPreparing] = React.useState(false)
   const [title, setTitle] = React.useState('')
   const [thumbnail, setThumbnail] = React.useState('')
   const [description, setDescription] = React.useState('')
@@ -384,9 +358,11 @@ export function ContentProductionPage() {
   const [scenes, setScenes] = React.useState<SceneDraft[]>([])
   const [audioLength, setAudioLength] = React.useState('1 jam')
   const [audioEnergy, setAudioEnergy] = React.useState('Fokus')
+  const [musicTrackCount, setMusicTrackCount] = React.useState(5)
   const [thumbStyle, setThumbStyle] = React.useState('')
   const [animationStyle, setAnimationStyle] = React.useState('')
   const [musicStyle, setMusicStyle] = React.useState('')
+  const [designTheme, setDesignTheme] = React.useState('cinematic')
   const [progress, setProgress] = React.useState(0)
   const [phase, setPhase] = React.useState('')
   const [videoUrl, setVideoUrl] = React.useState<string | null>(null)
@@ -394,17 +370,24 @@ export function ContentProductionPage() {
   const [generatedTitle, setGeneratedTitle] = React.useState('')
   const [savedDraft, setSavedDraft] = React.useState(false)
   const timers = React.useRef<number[]>([])
+  const backendSavedRef = React.useRef(false)
 
   React.useEffect(() => () => { timers.current.forEach((t) => window.clearTimeout(t)) }, [])
 
   const config = contentType ? nicheConfigs[contentType] : null
-  const selectedAccount = platformAccounts.find((a) => a.id === accountId) ?? null
+  const selectedAccount = accounts.find((a) => a.id === accountId) ?? null
+  const ytQueryValue =
+    ytQuery ??
+    (selectedAccount?.niche && selectedAccount.niche !== 'General'
+      ? selectedAccount.niche
+      : config?.label ?? '')
   const activeSteps = config?.steps ?? overviewSteps
   const idx = Math.max(0, activeSteps.findIndex((s) => s.key === step))
   const prevStep = idx > 0 ? activeSteps[idx - 1].key : null
   const selectedThumb = config?.thumbnailStyles.find((s) => s.id === thumbStyle) ?? config?.thumbnailStyles[0]
   const selectedAnimation = config?.animationStyles.find((s) => s.id === animationStyle) ?? config?.animationStyles[0]
   const selectedMusic = config?.musicStyles.find((s) => s.id === musicStyle) ?? config?.musicStyles[0]
+  const selectedTheme = designThemes.find((theme) => theme.id === designTheme) ?? designThemes[0]
   const sceneAnimation = config?.animationStyles.find((s) => s.id === scenes[0]?.animation) ?? selectedAnimation
   const totalSceneDuration = scenes.reduce((sum, scene) => sum + (Number.isFinite(scene.duration) ? scene.duration : 0), 0)
   const scriptWords = script.trim() ? script.trim().split(/\s+/).filter(Boolean).length : 0
@@ -418,52 +401,150 @@ export function ContentProductionPage() {
     setThumbStyle(next.thumbnailStyles[0].id)
     setAnimationStyle(next.animationStyles[0].id)
     setMusicStyle(next.musicStyles[0].id)
+    setYtQuery(null)
+    setYtResearch(null)
+    setYtError(null)
+    setIdeas([])
+    setSelectedIdea('')
     setStep('research')
   }
 
   const selectAccount = (id: string) => {
-    const account = platformAccounts.find((a) => a.id === id)
+    const account = accounts.find((a) => a.id === id)
     if (!account) return
     setAccountId(account.id)
     setPlatform(account.platform)
+    setYtQuery(null)
+    setYtResearch(null)
+    setYtError(null)
+    setIdeas([])
+    setSelectedIdea('')
   }
 
-  const runResearch = () => {
-    if (!contentType) return
+  const runResearch = async () => {
+    if (!contentType || !config || !selectedAccount) return
     setResearching(true)
-    const t = window.setTimeout(() => {
-      const list = ideaSeeds[contentType]
-      setIdeas(list)
-      setSelectedIdea(list[0])
+    try {
+      const res = await api.content.researchIdeas({
+        contentType,
+        platform,
+        accountId: selectedAccount.id,
+        niche: config.label,
+        format: platform === 'YouTube' ? 'long' : 'short',
+        ...(platform === 'YouTube' ? { researchQuery: ytQueryValue.trim() || config.label } : {}),
+      })
+      if (res.youtubeResearch) {
+        setYtResearch(res.youtubeResearch)
+        setYtError(null)
+      }
+      setIdeas(res.ideas)
+      setSelectedIdea(res.ideas[0]?.id ?? '')
+      const researchLabel = res.youtubeResearch?.configured
+        ? `${res.youtubeResearch.videos.length} video live`
+        : 'riset live tidak tersedia'
+      push({
+        title: 'Riset ide selesai',
+        description: `${res.ideas.length} rekomendasi dari ${res.provider} (${res.model}) · ${researchLabel}`,
+        tone: 'success',
+      })
+    } catch (error) {
+      push({
+        title: 'Riset ide gagal',
+        description: error instanceof Error ? error.message : 'Provider AI tidak tersedia.',
+        tone: 'warning',
+      })
+    } finally {
       setResearching(false)
-      push({ title: 'Riset ide selesai', description: `${list.length} ide ditemukan`, tone: 'success' })
-    }, 700)
-    timers.current.push(t)
+    }
   }
 
-  const prepareNext = () => {
-    if (!selectedIdea || !config || !selectedAccount) return
-    setTitle(selectedIdea)
-    setThumbnail(`Thumbnail: ${selectedIdea}`)
-    setDescription(`Konten ${config.label} tentang "${selectedIdea}". Dioptimalkan untuk ${platform} - ${selectedAccount.name}.`)
+  const runYouTubeResearch = async () => {
+    const query = ytQueryValue.trim()
+    if (!query) {
+      push({ title: 'Topik YouTube kosong', description: 'Isi topik atau niche untuk riset live.', tone: 'warning' })
+      return
+    }
+    setYtLoading(true)
+    setYtError(null)
+    try {
+      const res = await api.content.researchYouTube({ q: query, days: 90, maxResults: 10, refresh: true })
+      setYtResearch(res)
+      push({
+        title: 'Riset YouTube selesai',
+        description: `${res.videos.length} video live untuk "${res.query ?? query}".`,
+        tone: 'success',
+      })
+    } catch (error) {
+      setYtResearch(null)
+      setYtError(error instanceof Error ? error.message : 'Riset YouTube gagal.')
+    } finally {
+      setYtLoading(false)
+    }
+  }
+
+  const prepareNext = async () => {
+    const idea = ideas.find((item) => item.id === selectedIdea)
+    if (!idea || !config || !selectedAccount) return
+    setTitle(idea.title)
+    setThumbnail(idea.thumbnail ?? '')
+    setDescription(
+      `${idea.hook} ${idea.angle}${idea.reference ? ` Acuan riset: ${idea.reference}` : ''} Dioptimalkan untuk ${platform} - ${selectedAccount.name}.`,
+    )
     if (!config.needsScript) {
       setAudioLength(platform === 'YouTube' ? '1 jam' : '60 detik')
       setStep('brief')
       return
     }
-    setScript(initialScript(config.id, selectedIdea))
-    setScenes(defaultScenes(config.id, selectedIdea, config))
-    setDisclaimer(
-      config.id === 'konspirasi'
-        ? 'Konten ini membahas klaim yang diperdebatkan. Fakta, dugaan, dan spekulasi diberi label terpisah.'
-        : '',
-    )
-    setStep('script')
+
+    setPreparing(true)
+    try {
+      const res = await api.content.scriptFromIdea(idea.id, {
+        contentType: config.id,
+        platform,
+        animationStyles: config.animationStyles.map((style) => style.id),
+      })
+      setScript(res.script)
+      setScenes(
+        res.scenes.map((scene) => ({
+          id: uid('scene'),
+          title: scene.title,
+          narration: scene.narration,
+          visual: scene.visual,
+          duration: scene.duration,
+          animation: scene.animation,
+          claimType: scene.claimType,
+          source: scene.source ?? (config.id === 'konspirasi' ? '' : undefined),
+        })),
+      )
+      setDisclaimer(
+        res.disclaimer ||
+          (config.id === 'konspirasi'
+            ? 'Konten ini membahas klaim yang diperdebatkan. Fakta, dugaan, dan spekulasi diberi label terpisah.'
+            : ''),
+      )
+      push({ title: 'Naskah siap', description: `${res.scenes.length} scene dari ${res.provider}`, tone: 'success' })
+    } catch (error) {
+      setScript('')
+      setScenes([])
+      setDisclaimer(
+        config.id === 'konspirasi'
+          ? 'Konten ini membahas klaim yang diperdebatkan. Fakta, dugaan, dan spekulasi diberi label terpisah.'
+          : '',
+      )
+      push({
+        title: 'Naskah AI gagal',
+        description: error instanceof Error ? error.message : 'Tulis naskah secara manual.',
+        tone: 'warning',
+      })
+    } finally {
+      setPreparing(false)
+      setStep('script')
+    }
   }
 
   const goScenes = () => {
     if (!config || !script.trim()) return
-    setScenes(buildScenesFromScript(script, config.id, config))
+    if (scenes.length === 0) setScenes(buildScenesFromScript(script, config.id, config))
     setStep('scenes')
   }
 
@@ -529,22 +610,88 @@ export function ContentProductionPage() {
     setProgress(0)
     setPhase(config.phases[0])
     setSavedDraft(false)
+    backendSavedRef.current = false
     setStep('generate')
-    let p = 0
-    const iv = window.setInterval(() => {
-      p = Math.min(100, p + 6)
+
+    const backendRequest = api.content.generateProduction({
+      contentType: contentType ?? 'music',
+      title,
+      platform,
+      accountId: accountId || undefined,
+      niche: config.label,
+      format: platform === 'YouTube' ? 'long' : 'short',
+      brief: config.needsScript
+        ? undefined
+        : [description, thumbnail ? `Konsep thumbnail: ${thumbnail}` : ''].filter(Boolean).join(' '),
+      script: config.needsScript ? script : undefined,
+      audioLength,
+      audioEnergy,
+      musicTrackCount,
+      disclaimer: disclaimer || undefined,
+      thumbnailStyle: selectedThumb?.id ?? thumbStyle,
+      animationStyle: config.needsScript
+        ? sceneAnimation?.id ?? animationStyle
+        : selectedAnimation?.id ?? animationStyle,
+      musicStyle: selectedMusic?.id ?? musicStyle,
+      designTheme: selectedTheme?.id ?? designTheme,
+      scenes: config.needsScript
+        ? scenes.map((scene) => ({
+            title: scene.title,
+            narration: scene.narration,
+            visual: scene.visual,
+            animation: scene.animation,
+            duration: Math.max(1, Math.round(scene.duration)),
+            claimType: scene.claimType,
+            source: scene.source,
+          }))
+        : undefined,
+    })
+
+    const tick = { value: 0 }
+    const iv = window.setInterval(async () => {
+      tick.value = Math.min(100, tick.value + 6)
+      const p = tick.value
       setProgress(p)
       const phaseIndex = Math.min(config.phases.length - 1, Math.floor((p / 100) * config.phases.length))
       setPhase(config.phases[phaseIndex])
       if (p >= 100) {
         window.clearInterval(iv)
-        const poster = makePreviewSvg(title, contentType ?? 'konten', selectedThumb, sceneAnimation, selectedMusic)
-        const sample = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'
-        setPreviewUrl(poster)
-        setVideoUrl(sample)
-        setGeneratedTitle(title)
-        setStep('result')
-        push({ title: 'Kombinasi produksi selesai', description: 'Video siap diputar, diunduh, atau disimpan ke draft.', tone: 'success' })
+        try {
+          const res = await backendRequest
+          if (!res.media?.videoUrl || !res.media?.previewUrl) {
+            throw new Error('Backend tidak mengembalikan file video hasil render.')
+          }
+          setPreviewUrl(res.media.previewUrl)
+          setVideoUrl(res.media.videoUrl)
+          setGeneratedTitle(title)
+          if (res.item) backendSavedRef.current = true
+          if (res.energy && typeof res.energy.current === 'number') {
+            useContentStore.setState({ aiEnergy: res.energy.current, aiEnergyMax: res.energy.max })
+          } else {
+            addEnergy(cost)
+          }
+          setStep('result')
+          const seconds = res.media.render?.duration
+          const animationNote =
+            res.media.render?.videoProvider === 'kie' ? ' Animasi AI KIE.' : ''
+          push({
+            title: 'Video selesai dirender',
+            description: seconds
+              ? `MP4 ${seconds}s tersimpan di backend dan siap direview.${animationNote}`
+              : `Paket produksi tersimpan di backend dan siap direview.${animationNote}`,
+            tone: 'success',
+          })
+        } catch (error) {
+          addEnergy(cost)
+          setProgress(0)
+          setPhase('')
+          setStep('production')
+          push({
+            title: 'Render video gagal',
+            description: error instanceof Error ? error.message : 'Backend tidak tersedia.',
+            tone: 'warning',
+          })
+        }
       }
     }, 180)
     timers.current.push(iv as unknown as number)
@@ -561,6 +708,17 @@ export function ContentProductionPage() {
     push({ title: 'Unduhan dimulai', description: 'Video siap untuk diposting', tone: 'success' })
   }
 
+  const downloadThumbnail = () => {
+    const safe = (generatedTitle || title || 'konten').toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    const a = document.createElement('a')
+    a.href = previewUrl || ''
+    a.download = `${safe}-thumbnail.png`
+    a.target = '_blank'
+    a.rel = 'noopener'
+    a.click()
+    push({ title: 'Unduhan dimulai', description: 'Thumbnail murni siap dipakai', tone: 'success' })
+  }
+
   const productionLines = () => {
     if (!config) return []
     if (!config.needsScript) {
@@ -570,6 +728,7 @@ export function ContentProductionPage() {
         '',
         `Durasi audio: ${audioLength}`,
         `Energi audio: ${audioEnergy}`,
+        `Jumlah lagu: ${musicTrackCount}`,
       ]
     }
     return [
@@ -599,6 +758,7 @@ export function ContentProductionPage() {
         `Akun: ${selectedAccount?.name ?? '-'} (${selectedAccount?.handle ?? '-'})`,
         `Flow: ${config?.flowSummary ?? '-'}`,
         `Thumbnail style: ${selectedThumb?.label}`,
+        `Tema desain: ${selectedTheme?.label}`,
         `Animation: ${config?.needsScript ? `${scenes.length} scene` : selectedAnimation?.label}`,
         `Music: ${selectedMusic?.label}`,
         `Thumbnail: ${thumbnail}`,
@@ -613,39 +773,12 @@ export function ContentProductionPage() {
 
   const saveToDraft = () => {
     if (!videoUrl || savedDraft) return
-    const resolvedAccountId = selectedAccount?.id ?? platformAccounts.find((a) => a.platform === platform)?.id
-    addContent({
-      title,
-      platform,
-      accountId: resolvedAccountId,
-      niche: config?.label ?? 'Konten',
-      format: platform === 'YouTube' ? 'Long-form' : 'Short-form',
-      status: 'Draft',
-      scheduledAt: new Date().toISOString(),
-      views: 0,
-      engagement: 0,
-      thumbnail,
-      previewUrl: previewUrl ?? undefined,
-      videoUrl,
-      caption: description,
-      thumbnailStyle: selectedThumb?.label,
-      animationStyle: config?.needsScript ? `Per scene (${scenes.length})` : selectedAnimation?.label,
-      musicStyle: selectedMusic?.label,
-      hashtags: [contentType ?? 'konten', platform.toLowerCase(), selectedMusic?.label?.toLowerCase() ?? 'audio'],
-      script: [
-        `Judul: ${title}`,
-        `Akun: ${selectedAccount?.name ?? '-'} (${selectedAccount?.handle ?? '-'})`,
-        `Flow: ${config?.flowSummary ?? '-'}`,
-        `Thumbnail: ${thumbnail}`,
-        `Style thumbnail: ${selectedThumb?.label}`,
-        `Animasi: ${config?.needsScript ? `${scenes.length} scene` : selectedAnimation?.label}`,
-        `Musik: ${selectedMusic?.label}`,
-        ...productionLines(),
-      ].join('\n'),
-      generated: true,
-    })
+    if (!backendSavedRef.current) {
+      push({ title: 'Belum tersimpan', description: 'Render ulang agar konten masuk draft backend.', tone: 'warning' })
+      return
+    }
     setSavedDraft(true)
-    push({ title: 'Masuk ke draft', description: 'Kombinasi produksi tersimpan di Draft konten.', tone: 'success' })
+    push({ title: 'Tersimpan di backend', description: 'Konten sudah masuk draft dan library.', tone: 'success' })
   }
 
   const reset = () => {
@@ -663,9 +796,11 @@ export function ContentProductionPage() {
     setScenes([])
     setAudioLength('1 jam')
     setAudioEnergy('Fokus')
+    setMusicTrackCount(5)
     setThumbStyle('')
     setAnimationStyle('')
     setMusicStyle('')
+    setDesignTheme('cinematic')
     setVideoUrl(null)
     setPreviewUrl(null)
     setProgress(0)
@@ -770,6 +905,41 @@ export function ContentProductionPage() {
             description={`Tipe: ${types.find((t) => t.id === contentType)?.label} - Akun: ${selectedAccount?.name ?? '-'}`}
             action={<Badge tone="info">{platform}</Badge>}
           />
+          <div className="mb-3 text-[10px] leading-relaxed text-text-muted">
+            {platform === 'YouTube'
+              ? 'Data YouTube live dipakai lebih dulu, lalu AI menyusun rekomendasi judul, thumbnail, angle, dan acuan video.'
+              : 'AI menyusun rekomendasi judul, thumbnail, dan angle berdasarkan tipe konten yang dipilih.'}
+          </div>
+
+          {platform === 'YouTube' ? (
+            <div className="mb-4 rounded-xl border border-line bg-white/[0.02] p-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                <div className="min-w-0 flex-1">
+                  <label htmlFor="yt-research-query" className="mb-1.5 block text-[10px] uppercase tracking-[0.08em] text-text-muted">
+                    Niche / topik riset YouTube
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-muted" />
+                    <Input
+                      id="yt-research-query"
+                      value={ytQueryValue}
+                      onChange={(event) => setYtQuery(event.target.value)}
+                      onKeyDown={(event) => event.key === 'Enter' && void runResearch()}
+                      placeholder="Cari niche, mis. lofi study, ambient, indie..."
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => void runYouTubeResearch()} loading={ytLoading}>
+                  <Search /> Ambil data live
+                </Button>
+              </div>
+              <p className="mt-2 text-[9px] leading-relaxed text-text-muted">
+                Ketik niche yang ingin diriset. Data live ini yang dipakai AI untuk menyusun judul dan thumbnail.
+              </p>
+            </div>
+          ) : null}
+
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <span className="text-[11px] text-text-muted">Akun tujuan:</span>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-teal/40 bg-teal/10 px-2.5 py-1 text-[10px] text-teal">
@@ -785,22 +955,44 @@ export function ContentProductionPage() {
             </div>
           </div>
 
+          {platform === 'YouTube' && ytResearch?.configured && ideas.length ? (
+            <p className="mb-2 rounded-lg border border-teal/20 bg-teal/[0.04] px-3 py-2 text-[10px] leading-relaxed text-text-secondary">
+              Rekomendasi di bawah disusun dari {ytResearch.videos.length} video live query "{ytResearch.query}" ({ytResearch.windowDays} hari terakhir).
+            </p>
+          ) : null}
+
           {ideas.length ? (
             <div className="space-y-2">
               {ideas.map((idea) => (
                 <button
-                  key={idea}
+                  key={idea.id}
                   type="button"
-                  onClick={() => setSelectedIdea(idea)}
-                  className={cn('flex w-full items-center gap-3 rounded-xl border p-3 text-left', selectedIdea === idea ? 'border-teal/40 bg-teal/[0.06]' : 'border-line bg-white/[0.02]')}
+                  onClick={() => setSelectedIdea(idea.id)}
+                  className={cn('flex w-full items-start gap-3 rounded-xl border p-3 text-left', selectedIdea === idea.id ? 'border-teal/40 bg-teal/[0.06]' : 'border-line bg-white/[0.02]')}
                 >
-                  <Lightbulb className="size-4 shrink-0 text-primary" />
-                  <span className="flex-1 text-[12px] text-text-primary">{idea}</span>
-                  {selectedIdea === idea ? <CheckCircle2 className="size-4 text-teal" /> : null}
+                  <Lightbulb className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[12px] font-medium text-text-primary">{idea.title}</span>
+                    <span className="mt-1 block text-[10px] leading-relaxed text-text-muted">{idea.hook}</span>
+                    {idea.thumbnail ? (
+                      <span className="mt-1.5 flex items-start gap-1.5 text-[10px] leading-relaxed text-text-secondary">
+                        <ImageIcon className="mt-0.5 size-3 shrink-0 text-primary" />
+                        <span className="min-w-0 break-words"><span className="font-medium text-text-primary">Thumbnail:</span> {idea.thumbnail}</span>
+                      </span>
+                    ) : null}
+                    {idea.reference ? (
+                      <span className="mt-1 flex items-start gap-1.5 text-[10px] leading-relaxed text-text-secondary">
+                        <ExternalLink className="mt-0.5 size-3 shrink-0" />
+                        <span className="min-w-0 break-words"><span className="font-medium text-text-primary">Acuan:</span> {idea.reference}</span>
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="shrink-0 rounded-full border border-line px-2 py-0.5 text-[9px] text-text-muted">{idea.score}</span>
+                  {selectedIdea === idea.id ? <CheckCircle2 className="size-4 shrink-0 text-teal" /> : null}
                 </button>
               ))}
               <div className="flex justify-end pt-2">
-                <Button onClick={prepareNext} disabled={!selectedIdea}>
+                <Button onClick={prepareNext} loading={preparing} disabled={!selectedIdea}>
                   {config?.needsScript ? 'Lanjut tulis script' : 'Lanjut ke brief audio'}
                   {config?.needsScript ? <FileText /> : <AudioLines />}
                 </Button>
@@ -808,9 +1000,105 @@ export function ContentProductionPage() {
             </div>
           ) : (
             <div className="rounded-xl border border-dashed border-line px-6 py-10 text-center text-[11px] text-text-muted">
-              Klik "{config?.needsScript ? 'Riset ide konten' : 'Riset referensi audio'}" untuk mendapatkan ide berdasarkan tipe yang dipilih.
+              {platform === 'YouTube'
+                ? 'Ketik niche di kolom atas, lalu riset video live dan susun rekomendasi judul, thumbnail, serta angle.'
+                : `Klik "${config?.needsScript ? 'Riset ide konten' : 'Riset referensi audio'}" untuk mendapatkan rekomendasi berdasarkan tipe konten yang dipilih.`}
             </div>
           )}
+
+          {platform === 'YouTube' ? (
+            <div className="mt-5 border-t border-line pt-4">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="text-[12px] font-semibold text-text-primary">Riset YouTube live</p>
+                  <p className="mt-0.5 text-[10px] text-text-muted">
+                    Tren dan kompetitor dari YouTube Data API v3, bukan data simulasi.
+                  </p>
+                </div>
+                <Badge tone={ytResearch ? 'success' : 'outline'}>{ytResearch ? 'Live' : 'Belum diambil'}</Badge>
+              </div>
+
+              {ytError ? (
+                <div className="mt-3 rounded-xl border border-danger/25 bg-danger/[0.04] p-3">
+                  <p className="text-[11px] font-medium text-text-primary">Riset YouTube gagal</p>
+                  <p className="mt-1 text-[10px] leading-relaxed text-text-secondary">{ytError}</p>
+                  <p className="mt-1 text-[9px] text-text-muted">
+                    Pastikan channel YouTube terhubung lewat OAuth atau YOUTUBE_API_KEY terisi di backend.
+                  </p>
+                </div>
+              ) : null}
+
+              {ytResearch && !ytResearch.configured ? (
+                <p className="mt-3 rounded-xl border border-line bg-white/[0.02] p-3 text-[10px] text-text-muted">
+                  {ytResearch.reason ?? 'Riset YouTube belum siap.'}
+                </p>
+              ) : ytResearch ? (
+                <div className="mt-3">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <div className="rounded-lg border border-line bg-black/20 p-2.5">
+                      <p className="text-[9px] uppercase tracking-[0.08em] text-text-muted">Median views</p>
+                      <p className="num mt-1 text-[13px] font-semibold text-text-primary">{formatNumber(ytResearch.patterns.medianViews, true)}</p>
+                    </div>
+                    <div className="rounded-lg border border-line bg-black/20 p-2.5">
+                      <p className="text-[9px] uppercase tracking-[0.08em] text-text-muted">Views/hari</p>
+                      <p className="num mt-1 text-[13px] font-semibold text-text-primary">{formatNumber(ytResearch.patterns.medianViewsPerDay, true)}</p>
+                    </div>
+                    <div className="rounded-lg border border-line bg-black/20 p-2.5">
+                      <p className="text-[9px] uppercase tracking-[0.08em] text-text-muted">Shorts share</p>
+                      <p className="num mt-1 text-[13px] font-semibold text-text-primary">{formatPercent(ytResearch.patterns.shortsShare)}</p>
+                    </div>
+                    <div className="rounded-lg border border-line bg-black/20 p-2.5">
+                      <p className="text-[9px] uppercase tracking-[0.08em] text-text-muted">Sampel</p>
+                      <p className="num mt-1 text-[13px] font-semibold text-text-primary">{ytResearch.patterns.sampleSize} video</p>
+                    </div>
+                  </div>
+
+                  {ytResearch.videos.length ? (
+                    <div className="mt-3 overflow-x-auto">
+                      <table className="w-full min-w-[620px] text-left">
+                        <thead>
+                          <tr className="border-b border-line text-[9px] uppercase tracking-[0.08em] text-text-muted">
+                            <th className="px-2 py-2 font-medium">Video</th>
+                            <th className="px-2 py-2 text-right font-medium">Views</th>
+                            <th className="px-2 py-2 text-right font-medium">Views/hari</th>
+                            <th className="px-2 py-2 text-right font-medium">Outlier</th>
+                            <th className="px-2 py-2 text-right font-medium">Subs</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {ytResearch.videos.slice(0, 5).map((video) => (
+                            <tr key={video.videoId} className="border-b border-line/60 last:border-0">
+                              <td className="max-w-[280px] px-2 py-2">
+                                <a href={video.url} target="_blank" rel="noreferrer" className="line-clamp-2 text-[10px] font-medium text-text-primary hover:text-primary">
+                                  {video.title}
+                                  <ExternalLink className="ml-1 inline size-2.5 align-[-1px]" />
+                                </a>
+                                <p className="mt-0.5 truncate text-[9px] text-text-muted">{video.channelTitle}</p>
+                              </td>
+                              <td className="num whitespace-nowrap px-2 py-2 text-right text-[10px] text-text-secondary">{formatNumber(video.views, true)}</td>
+                              <td className="num whitespace-nowrap px-2 py-2 text-right text-[10px] text-text-secondary">{formatNumber(video.viewsPerDay, true)}</td>
+                              <td className="num whitespace-nowrap px-2 py-2 text-right text-[10px] text-primary">{video.outlierRatio.toFixed(2)}x</td>
+                              <td className="num whitespace-nowrap px-2 py-2 text-right text-[10px] text-text-muted">{formatNumber(video.subscriberCount, true)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-[10px] text-text-muted">Tidak ada video pada jendela 90 hari untuk query ini.</p>
+                  )}
+                  <p className="mt-2 text-[9px] leading-relaxed text-text-muted">
+                    Menampilkan 5 video teratas dari {ytResearch.patterns.sampleSize} sampel · {ytResearch.windowDays} hari terakhir · {ytResearch.regionCode} · outlier = views / median sampel ·
+                    data live, cache backend 1 jam.
+                  </p>
+                </div>
+              ) : (
+                <p className="mt-3 text-[10px] leading-relaxed text-text-muted">
+                  Ketik niche di kolom atas lalu klik "Ambil data live" atau "Riset referensi audio" untuk melihat video kompetitor, views per hari, dan rasio outlier.
+                </p>
+              )}
+            </div>
+          ) : null}
         </Card>
       ) : null}
 
@@ -851,6 +1139,19 @@ export function ContentProductionPage() {
                   ))}
                 </div>
               </div>
+              <div>
+                <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-medium text-text-secondary"><Music className="size-3.5" /> Jumlah lagu</p>
+                <div className="flex flex-wrap gap-2">
+                  {musicTrackOptions.map((option) => (
+                    <button key={option} type="button" onClick={() => setMusicTrackCount(option)} className={cn('rounded-full border px-3 py-1.5 text-[10px]', musicTrackCount === option ? 'border-teal/45 bg-teal/10 text-teal' : 'border-line text-text-muted')}>
+                      {option} lagu
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-[9px] leading-relaxed text-text-muted">
+                  Suno membuat {musicTrackCount} lagu dengan genre, tipe, dan mood yang sama; aransemen tiap lagu dibuat berbeda lalu digabung menjadi satu playlist.
+                </p>
+              </div>
             </div>
             <div className="mt-5 flex justify-end gap-2 border-t border-line pt-4">
               <Button variant="secondary" onClick={goBack}><ArrowLeft /> Kembali</Button>
@@ -863,7 +1164,7 @@ export function ContentProductionPage() {
               <p className="text-[10px] uppercase tracking-[0.12em] text-teal/80">Brief audio</p>
               <p className="mt-2 text-[13px] font-semibold text-text-primary">{title || 'Judul konten'}</p>
               <p className="mt-2 text-[11px] leading-relaxed text-text-muted">{description || 'Brief audio akan muncul di sini.'}</p>
-              <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 <div className="rounded-lg border border-line bg-black/20 p-2.5">
                   <p className="text-[9px] uppercase tracking-[0.08em] text-text-muted">Durasi</p>
                   <p className="mt-1 text-[11px] text-text-secondary">{audioLength}</p>
@@ -871,6 +1172,10 @@ export function ContentProductionPage() {
                 <div className="rounded-lg border border-line bg-black/20 p-2.5">
                   <p className="text-[9px] uppercase tracking-[0.08em] text-text-muted">Energi</p>
                   <p className="mt-1 text-[11px] text-text-secondary">{audioEnergy}</p>
+                </div>
+                <div className="rounded-lg border border-line bg-black/20 p-2.5">
+                  <p className="text-[9px] uppercase tracking-[0.08em] text-text-muted">Lagu</p>
+                  <p className="mt-1 text-[11px] text-text-secondary">{musicTrackCount} lagu</p>
                 </div>
               </div>
             </div>
@@ -1067,6 +1372,27 @@ export function ContentProductionPage() {
             <SectionHeader title={config.stepLabel} description={config.stepHint} action={<Badge tone="primary">{config.label}</Badge>} />
             <div className="space-y-5">
               <section>
+                <p className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-text-secondary"><Palette className="size-3.5" /> Tema desain visual</p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+                  {designThemes.map((theme) => (
+                    <button
+                      key={theme.id}
+                      type="button"
+                      onClick={() => setDesignTheme(theme.id)}
+                      className={cn('rounded-xl border p-2.5 text-left transition-colors', designTheme === theme.id ? 'border-teal/45 bg-teal/[0.07]' : 'border-line bg-white/[0.02] hover:border-line-strong')}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <span className="size-2.5 rounded-full" style={{ backgroundColor: theme.accent }} />
+                        <span className="text-[10px] font-medium text-text-primary">{theme.label}</span>
+                      </span>
+                      <span className="mt-1 block text-[8px] leading-relaxed text-text-muted">{theme.desc}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-[9px] text-text-muted">Tema ini dipakai untuk gambar GPT Image 2 dan animasi AI.</p>
+              </section>
+
+              <section>
                 <p className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-text-secondary"><ImageIcon className="size-3.5" /> Style gambar thumbnail</p>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                   {config.thumbnailStyles.map((style) => (
@@ -1152,13 +1478,17 @@ export function ContentProductionPage() {
           <Card className="p-5">
             <SectionHeader title="Preview kombinasi" description="Cek arah visual dan audio sebelum generate" />
             <div className="overflow-hidden rounded-xl border border-line bg-black">
-              <img src={makePreviewSvg(title, contentType ?? 'konten', selectedThumb, sceneAnimation, selectedMusic)} alt="Preview kombinasi produksi" className="aspect-video w-full object-cover" />
+              <img src={makePreviewSvg(title, contentType ?? 'konten', selectedThumb, sceneAnimation, selectedMusic, selectedTheme)} alt="Preview kombinasi produksi" className="aspect-video w-full object-cover" />
             </div>
             <div className="mt-3 space-y-2">
               {[
                 { label: 'Thumbnail', value: selectedThumb?.label, icon: <ImageIcon className="size-3" /> },
+                { label: 'Tema', value: selectedTheme?.label, icon: <Palette className="size-3" /> },
                 { label: 'Animasi', value: config.needsScript ? `${scenes.length} scene` : selectedAnimation?.label, icon: <Clapperboard className="size-3" /> },
                 { label: 'Music', value: selectedMusic?.label, icon: <Music className="size-3" /> },
+                ...(config.needsScript
+                  ? []
+                  : [{ label: 'Lagu', value: `${musicTrackCount} lagu`, icon: <Music className="size-3" /> }]),
                 ...(config.needsScript
                   ? [{ label: 'Durasi scene', value: `${totalSceneDuration} detik`, icon: <Clock3 className="size-3" /> }]
                   : [{ label: 'Durasi audio', value: audioLength, icon: <Clock3 className="size-3" /> }]),
@@ -1197,7 +1527,7 @@ export function ContentProductionPage() {
         <Card className="p-8 text-center">
           <span className="mx-auto grid size-14 place-items-center rounded-2xl border border-teal/30 bg-teal/10 text-teal"><Wand2 className="size-6" /></span>
           <p className="mt-4 text-[15px] font-semibold text-text-primary">
-            {config?.needsScript ? 'Menyusun narasi, scene, dan musik...' : 'Menggabungkan artwork, visualizer, dan audio...'}
+            {config?.needsScript ? 'Menyusun narasi, scene, dan musik...' : 'Membuat thumbnail murni, animasi AI, dan audio...'}
           </p>
           <p className="mt-1 text-[11px] text-text-muted">{phase || 'Menyiapkan render'} - {config?.label}</p>
           <div className="mx-auto mt-5 max-w-md">
@@ -1225,7 +1555,7 @@ export function ContentProductionPage() {
       {step === 'result' && videoUrl ? (
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.5fr_1fr]">
           <Card className="p-5">
-            <SectionHeader title="Hasil gabungan" description={config?.needsScript ? 'Video final dari script, animasi per scene, dan musik' : 'Video final dari artwork, visualizer, dan audio'} />
+            <SectionHeader title="Hasil gabungan" description={config?.needsScript ? 'Video final dari script, animasi per scene, dan musik' : 'Thumbnail murni dan video animasi AI dari artwork + audio'} />
             <div className="overflow-hidden rounded-xl border border-line bg-black">
               <video controls poster={previewUrl ?? undefined} className="aspect-video w-full">
                 <source src={videoUrl} type="video/mp4" />
@@ -1233,6 +1563,7 @@ export function ContentProductionPage() {
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               <Button onClick={downloadVideo}><Download /> Unduh video</Button>
+              <Button variant="secondary" onClick={downloadThumbnail}><ImageIcon /> Unduh thumbnail</Button>
               <Button variant="secondary" onClick={downloadPack}><Download /> Unduh paket produksi</Button>
               <Button variant={savedDraft ? 'ghost' : 'soft'} onClick={saveToDraft} disabled={savedDraft}>
                 {savedDraft ? <CheckCircle2 /> : <Save />} {savedDraft ? 'Tersimpan di draft' : 'Masuk ke draft'}

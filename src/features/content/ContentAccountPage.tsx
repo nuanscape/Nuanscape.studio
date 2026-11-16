@@ -6,7 +6,6 @@ import { buttonVariants } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { ContentFormatBadge, contentFormats, formatBasePath, resolveAccount } from '@/features/content/components/content-flow'
 import { ContentStatusBadge, PlatformChip, statusOrder } from '@/features/content/components/content-ui'
-import { platformAccounts } from '@/data/mock'
 import { useContentStore } from '@/stores/content-store'
 import { cn, formatDate, formatNumber, formatPercent } from '@/lib/utils'
 
@@ -14,7 +13,8 @@ export function ContentAccountPage() {
   const { accountId } = useParams<{ accountId: string }>()
   const items = useContentStore((s) => s.items)
   const ideas = useContentStore((s) => s.ideas)
-  const account = platformAccounts.find((entry) => entry.id === accountId)
+  const accounts = useContentStore((s) => s.accounts)
+  const account = accounts.find((entry) => entry.id === accountId)
 
   if (!account) {
     return (
